@@ -1,5 +1,21 @@
 # Lumoza Studio — Master README + Codex Development Guide
 
+## Repository Status
+
+This repository now has:
+
+- A master product and implementation guide in this `README`
+- A product baseline in `docs/PRODUCT_FOUNDATION.md`
+- Local git initialization and version history on `main`
+
+Current total product progress: 35%
+
+Immediate repo priorities:
+
+1. Preserve the phase-based build discipline defined below.
+2. Convert the product direction into concrete architecture and implementation artifacts.
+3. Build only Phase 1 until explicitly instructed to continue.
+
 ## Product Overview
 
 Lumoza Studio is a professional offline-first AI-powered desktop application for intelligent photo curation and memory selection.
