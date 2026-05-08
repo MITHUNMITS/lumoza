@@ -479,6 +479,10 @@ Required tactics:
 - Background worker isolation from UI thread
 - Cache directory separated from originals
 
+## Current Implementation Note
+
+The current implementation already includes a first synchronous recursive indexing slice that discovers supported images, writes metadata into SQLite, and updates project counts. Pause, resume, cancel, and live progress remain placeholders until async task orchestration is added.
+
 ## Failure Handling
 
 Phase 1 should treat failures as operational events, not silent drops.

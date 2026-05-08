@@ -6,7 +6,7 @@ import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { createProject, listProjects } from "../services/projectService";
-import { pauseScan, resumeScan, startScan, cancelScan } from "../services/scanService";
+import { cancelScan, pauseScan, resumeScan, startScan } from "../services/scanService";
 import { bootstrapApplication, getSystemStatus } from "../services/systemStatusService";
 import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -87,15 +87,39 @@ export function App() {
     if (!currentProject) {
       return;
     }
-    const task = await startScan(currentProject.projectId);
-    setActiveTask(task);
-    addActivity({
-      id: crypto.randomUUID(),
-      eventType: "scan_started",
-      severity: "info",
-      message: `Started scan for ${currentProject.name}.`,
-      createdAt: new Date().toISOString(),
-    });
+
+    try {
+      const task = await startScan(currentProject.projectId);
+      setActiveTask(task);
+      const refreshedProjects = await listProjects();
+      setProjects(refreshedProjects);
+      openProject(currentProject.projectId);
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "scan_completed",
+        severity: task.failedCount > 0 ? "warning" : "info",
+        message: task.message,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      setActiveTask({
+        id: crypto.randomUUID(),
+        projectId: currentProject.projectId,
+        status: "error",
+        progressCurrent: 0,
+        progressTotal: 0,
+        message: error instanceof Error ? error.message : "Scan failed.",
+        indexedCount: 0,
+        failedCount: 0,
+      });
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "scan_failed",
+        severity: "error",
+        message: error instanceof Error ? error.message : "Scan failed.",
+        createdAt: new Date().toISOString(),
+      });
+    }
   }
 
   async function handlePauseScan() {
@@ -104,6 +128,13 @@ export function App() {
     }
     const task = await pauseScan(activeTask.id, currentProject.projectId);
     setActiveTask(task);
+    addActivity({
+      id: crypto.randomUUID(),
+      eventType: "scan_paused",
+      severity: "info",
+      message: task.message,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async function handleResumeScan() {
@@ -112,6 +143,13 @@ export function App() {
     }
     const task = await resumeScan(activeTask.id, currentProject.projectId);
     setActiveTask(task);
+    addActivity({
+      id: crypto.randomUUID(),
+      eventType: "scan_resumed",
+      severity: "info",
+      message: task.message,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async function handleCancelScan() {
@@ -120,6 +158,13 @@ export function App() {
     }
     const task = await cancelScan(activeTask.id, currentProject.projectId);
     setActiveTask(task);
+    addActivity({
+      id: crypto.randomUUID(),
+      eventType: "scan_cancelled",
+      severity: "warning",
+      message: task.message,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   if (isBootstrapping) {
@@ -139,9 +184,9 @@ export function App() {
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Current total product progress: 76%
+        Current total product progress: 87%
 
-Phase 1 scaffold only. Advanced AI stays locked out.
+Phase 1 only. The first real indexing slice is live; advanced AI stays locked out.
       </div>
     </div>
   );

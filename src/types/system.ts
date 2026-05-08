@@ -14,6 +14,8 @@ export interface ScanTask {
   progressCurrent: number;
   progressTotal: number;
   message: string;
+  indexedCount: number;
+  failedCount: number;
 }
 
 export interface ActivityItem {

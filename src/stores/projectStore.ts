@@ -12,7 +12,11 @@ interface ProjectState {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   currentProject: undefined,
-  setProjects: (projects) => set({ projects }),
+  setProjects: (projects) =>
+    set((state) => ({
+      projects,
+      currentProject: state.currentProject ? projects.find((entry) => entry.projectId === state.currentProject?.projectId) : undefined,
+    })),
   addProject: (project) => set((state) => ({ projects: [project, ...state.projects], currentProject: project })),
   openProject: (projectId) => {
     const project = get().projects.find((entry) => entry.projectId === projectId);

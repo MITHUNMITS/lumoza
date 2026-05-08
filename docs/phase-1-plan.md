@@ -4,7 +4,7 @@
 
 Deliver a stable, premium-feeling desktop foundation for local project creation, photo ingestion, scanning, indexing, thumbnails, and progress tracking.
 
-Current total product progress: 76%
+Current total product progress: 87%
 
 ## Phase 1 Deliverables
 
@@ -17,6 +17,7 @@ Current total product progress: 76%
 - Multi-project registry
 - Per-project SQLite database initialization
 - Recursive photo scan pipeline
+- Real recursive indexing for supported image discovery and SQLite photo ingestion
 - Thumbnail generation pipeline
 - Photo grid page with virtualization
 - Progress controls for pause, resume, and cancel

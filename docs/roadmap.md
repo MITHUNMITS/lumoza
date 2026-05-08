@@ -4,7 +4,7 @@
 
 Lumoza is in architecture-to-foundation transition.
 
-Current total product progress: 76%
+Current total product progress: 87%
 
 ## Phases
 

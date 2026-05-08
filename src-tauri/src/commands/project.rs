@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -45,7 +46,6 @@ pub fn create_project(
     let db_path = project_root.join("project.db");
 
     std::fs::create_dir_all(&cache_path).map_err(|error| error.to_string())?;
-    database::initialize_project_database(&db_path).map_err(|error| error.to_string())?;
 
     let summary = ProjectSummary {
         project_id,
@@ -58,6 +58,7 @@ pub fn create_project(
         last_opened_at: Some(Utc::now().to_rfc3339()),
     };
 
+    database::ensure_project_bootstrap(&db_path, &summary).map_err(|error| error.to_string())?;
     project_registry::append_project(&app, &summary).map_err(|error| error.to_string())?;
     state.set_last_project(summary.project_id.clone());
 

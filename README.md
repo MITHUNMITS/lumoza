@@ -8,7 +8,7 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current total product progress: 76%
+Current total product progress: 87%
 
 Immediate repo priorities:
 
@@ -677,7 +677,7 @@ Every long operation must show:
 Overall Progress: 42%
 File Scan: 100%
 Thumbnail Generation: 78%
-Duplicate Detection: 76%
+Duplicate Detection: 87%
 Face Detection: Pending
 ```
 
