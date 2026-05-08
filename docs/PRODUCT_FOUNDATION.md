@@ -6,18 +6,17 @@ This document exists to stop accidental product drift. It captures what is still
 
 ## Current Truth
 
-Lumoza has a project name, ambition, and a clean repository start. It does not yet have a locked product definition.
+Lumoza now has a defined product direction in `README.md`: an offline-first AI-powered desktop application for intelligent photo curation. The repository still needs implementation-grade decisions and validation details before major build-out.
 
 ## Immediate Gaps
 
-- No validated user problem
-- No target customer segment
-- No primary workflow
-- No revenue or operating model
-- No stack decision
-- No data model
-- No authentication strategy
-- No release plan
+- No validated user research yet
+- No explicit buyer or monetization plan
+- No final Phase 1 architecture document
+- No detailed data model
+- No authentication and licensing strategy
+- No release and packaging execution plan
+- No test and observability baseline
 
 ## Risks If We Skip Definition
 
