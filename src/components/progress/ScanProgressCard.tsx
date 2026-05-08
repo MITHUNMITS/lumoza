@@ -44,6 +44,14 @@ export function ScanProgressCard({ task, onPause, onResume, onCancel }: ScanProg
           <span>Unreadable entries</span>
           <span className="text-text">{task.failedCount}</span>
         </div>
+        <div className="flex items-center justify-between">
+          <span>Generated thumbnails</span>
+          <span className="text-text">{task.thumbnailGeneratedCount}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Thumbnail failures</span>
+          <span className="text-text">{task.thumbnailFailedCount}</span>
+        </div>
       </div>
       <div className="mt-5 flex gap-3">
         <button type="button" onClick={onPause} disabled={isTerminal} className="rounded-full border border-white/10 px-4 py-2 text-sm text-text disabled:opacity-40">Pause</button>

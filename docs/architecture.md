@@ -481,7 +481,7 @@ Required tactics:
 
 ## Current Implementation Note
 
-The current implementation already includes a first synchronous recursive indexing slice that discovers supported images, writes metadata into SQLite, and updates project counts. Pause, resume, cancel, and live progress remain placeholders until async task orchestration is added.
+The current implementation now includes a background scan task model that discovers supported images, indexes metadata into SQLite, generates bounded cached thumbnails in app-managed storage, updates project counts, exposes polled task state for pause, resume, and cancel requests, renders indexed media through a virtualized workspace browser with asset-backed thumbnail previews, surfaces dedicated operations views for session activity, incident reporting, and system health, and now passes native Rust compile plus macOS `.app` bundle validation. Richer event streaming remains a later refinement, but the core Phase 1 product surface is now real end-to-end.
 
 ## Failure Handling
 

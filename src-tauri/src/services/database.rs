@@ -4,8 +4,10 @@ use anyhow::Context;
 use chrono::Utc;
 use rusqlite::{params, Connection, Transaction};
 
-use crate::commands::project::ProjectSummary;
-use crate::services::scan_indexer::IndexedPhoto;
+use crate::{
+    commands::project::ProjectSummary,
+    services::{scan_indexer::IndexedPhoto, thumbnail_pipeline::GeneratedThumbnail},
+};
 
 const MIGRATION_SQL: &str = include_str!("../../migrations/0001_init.sql");
 
@@ -13,6 +15,20 @@ const MIGRATION_SQL: &str = include_str!("../../migrations/0001_init.sql");
 pub struct PersistedScanSummary {
     pub indexed_count: u64,
     pub failed_count: u64,
+}
+
+#[derive(Debug)]
+pub struct ProjectPhotoRecord {
+    pub id: String,
+    pub absolute_path: String,
+    pub filename: String,
+    pub extension: String,
+    pub file_size_bytes: u64,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub modified_at: Option<String>,
+    pub thumbnail_status: String,
+    pub thumbnail_cache_path: Option<String>,
 }
 
 pub fn initialize_project_database(path: &Path) -> anyhow::Result<()> {
@@ -128,6 +144,130 @@ pub fn persist_scan(
         indexed_count: photos.len() as u64,
         failed_count,
     })
+}
+
+
+pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+    let connection = open_connection(path)?;
+    let mut statement = connection.prepare(
+        "SELECT
+            photos.id,
+            photos.absolute_path,
+            photos.filename,
+            photos.extension,
+            photos.file_size_bytes,
+            photos.width,
+            photos.height,
+            photos.modified_at,
+            photos.thumbnail_status,
+            thumbnails.cache_path
+         FROM photos
+         LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
+         ORDER BY COALESCE(photos.modified_at, '') DESC, photos.filename ASC
+         LIMIT ?1 OFFSET ?2",
+    )?;
+
+    let rows = statement.query_map(params![limit as i64, offset as i64], |row| {
+        Ok(ProjectPhotoRecord {
+            id: row.get::<_, String>(0)?,
+            absolute_path: row.get::<_, String>(1)?,
+            filename: row.get::<_, String>(2)?,
+            extension: row.get::<_, String>(3)?,
+            file_size_bytes: row.get::<_, i64>(4)? as u64,
+            width: row.get::<_, Option<i64>>(5)?.map(|value| value as u32),
+            height: row.get::<_, Option<i64>>(6)?.map(|value| value as u32),
+            modified_at: row.get::<_, Option<String>>(7)?,
+            thumbnail_status: row.get::<_, String>(8)?,
+            thumbnail_cache_path: row.get::<_, Option<String>>(9)?,
+        })
+    })?;
+
+    let mut photos = Vec::new();
+    for row in rows {
+        photos.push(row?);
+    }
+
+    Ok(photos)
+}
+
+pub fn persist_thumbnail_updates(
+    path: &Path,
+    generated: &[GeneratedThumbnail],
+    failed_photo_ids: &[String],
+) -> anyhow::Result<()> {
+    let mut connection = open_connection(path)?;
+    let transaction = connection.transaction()?;
+    let now = Utc::now().to_rfc3339();
+
+    {
+        let mut thumbnail_statement = transaction.prepare(
+            "INSERT INTO thumbnails (id, photo_id, cache_path, width, height, generated_at, generation_status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO UPDATE SET
+               cache_path = excluded.cache_path,
+               width = excluded.width,
+               height = excluded.height,
+               generated_at = excluded.generated_at,
+               generation_status = excluded.generation_status",
+        )?;
+
+        let mut photo_statement = transaction.prepare(
+            "UPDATE photos SET width = ?2, height = ?3, thumbnail_status = ?4 WHERE id = ?1",
+        )?;
+
+        for record in generated {
+            thumbnail_statement.execute(params![
+                format!("thumb:{}", record.photo_id),
+                record.photo_id.as_str(),
+                record.cache_path.as_str(),
+                record.thumbnail_width as i64,
+                record.thumbnail_height as i64,
+                now.as_str(),
+                "generated",
+            ])?;
+            photo_statement.execute(params![
+                record.photo_id.as_str(),
+                record.original_width as i64,
+                record.original_height as i64,
+                "generated",
+            ])?;
+        }
+    }
+
+    {
+        let mut failed_statement = transaction.prepare(
+            "UPDATE photos SET thumbnail_status = 'failed' WHERE id = ?1",
+        )?;
+        for photo_id in failed_photo_ids {
+            failed_statement.execute(params![photo_id.as_str()])?;
+        }
+    }
+
+    if !generated.is_empty() || !failed_photo_ids.is_empty() {
+        transaction.execute(
+            "INSERT INTO activity_log (id, event_type, severity, message, payload_json, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                format!("thumb-update-{}", now),
+                "thumbnails_generated",
+                if failed_photo_ids.is_empty() { "info" } else { "warning" },
+                format!(
+                    "Generated {} thumbnails and skipped {} unsupported or unreadable files.",
+                    generated.len(),
+                    failed_photo_ids.len()
+                ),
+                format!(
+                    r#"{{"generatedCount": {}, "failedCount": {}}}"#,
+                    generated.len(),
+                    failed_photo_ids.len()
+                ),
+                now.as_str(),
+            ],
+        )?;
+    }
+
+    transaction.commit()?;
+    Ok(())
 }
 
 fn open_connection(path: &Path) -> anyhow::Result<Connection> {

@@ -16,6 +16,8 @@ export interface ScanTask {
   message: string;
   indexedCount: number;
   failedCount: number;
+  thumbnailGeneratedCount: number;
+  thumbnailFailedCount: number;
 }
 
 export interface ActivityItem {

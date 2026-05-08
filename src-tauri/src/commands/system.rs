@@ -1,4 +1,7 @@
 use serde::Serialize;
+use tauri::State;
+
+use crate::state::app_state::AppState;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -10,11 +13,11 @@ pub struct SystemStatusResponse {
 }
 
 #[tauri::command]
-pub fn get_system_status() -> SystemStatusResponse {
+pub fn get_system_status(state: State<AppState>) -> SystemStatusResponse {
     SystemStatusResponse {
         python_sidecar: "placeholder".into(),
         sqlite: "ready".into(),
         registry: "ready".into(),
-        active_task_count: 0,
+        active_task_count: state.runtime().active_task_count(),
     }
 }

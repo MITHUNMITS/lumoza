@@ -28,6 +28,21 @@ pub struct CreateProjectInput {
     pub root_folder: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPhotoResponse {
+    pub id: String,
+    pub absolute_path: String,
+    pub filename: String,
+    pub extension: String,
+    pub file_size_bytes: u64,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub modified_at: Option<String>,
+    pub thumbnail_status: String,
+    pub thumbnail_cache_path: Option<String>,
+}
+
 #[tauri::command]
 pub fn list_projects(app: AppHandle) -> Result<Vec<ProjectSummary>, String> {
     project_registry::load_registry(&app).map_err(|error| error.to_string())
@@ -63,6 +78,44 @@ pub fn create_project(
     state.set_last_project(summary.project_id.clone());
 
     Ok(summary)
+}
+
+#[tauri::command]
+pub fn list_project_photos(
+    app: AppHandle,
+    project_id: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+) -> Result<Vec<ProjectPhotoResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let safe_limit = limit.unwrap_or(180).clamp(1, 240);
+    let safe_offset = offset.unwrap_or(0);
+
+    let photos = database::list_project_photos(
+        PathBuf::from(&project.project_db_path).as_path(),
+        safe_offset,
+        safe_limit,
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(photos
+        .into_iter()
+        .map(|photo| ProjectPhotoResponse {
+            id: photo.id,
+            absolute_path: photo.absolute_path,
+            filename: photo.filename,
+            extension: photo.extension,
+            file_size_bytes: photo.file_size_bytes,
+            width: photo.width,
+            height: photo.height,
+            modified_at: photo.modified_at,
+            thumbnail_status: photo.thumbnail_status,
+            thumbnail_cache_path: photo.thumbnail_cache_path,
+        })
+        .collect())
 }
 
 #[tauri::command]

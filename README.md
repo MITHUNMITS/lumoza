@@ -8,7 +8,9 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current total product progress: 87%
+Current total product progress: 100%
+
+Phase 1 status: complete, including native Rust/Tauri compile and macOS app bundle validation.
 
 Immediate repo priorities:
 
@@ -677,7 +679,7 @@ Every long operation must show:
 Overall Progress: 42%
 File Scan: 100%
 Thumbnail Generation: 78%
-Duplicate Detection: 87%
+Duplicate Detection: 92%
 Face Detection: Pending
 ```
 

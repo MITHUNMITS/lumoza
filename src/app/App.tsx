@@ -3,18 +3,35 @@ import { AppShell } from "../components/layout/AppShell";
 import { StartupSplash } from "../components/splash/StartupSplash";
 import { CreateProject } from "../pages/CreateProject";
 import { ProjectDashboard } from "../pages/ProjectDashboard";
+import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
+import { listProjectPhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
-import { cancelScan, pauseScan, resumeScan, startScan } from "../services/scanService";
+import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
 import { bootstrapApplication, getSystemStatus } from "../services/systemStatusService";
 import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
-import type { CreateProjectInput } from "../types/project";
+import type { CreateProjectInput, ProjectPhoto } from "../types/project";
+import type { ScanTask, SystemStatus } from "../types/system";
+
+const PHOTO_PAGE_SIZE = 180;
+
+function isTerminal(task?: ScanTask) {
+  return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
+}
 
 export function App() {
   const [statusText, setStatusText] = useState("Preparing desktop foundation...");
+  const [projectPhotos, setProjectPhotos] = useState<ProjectPhoto[]>([]);
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+  const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
+  const [hasMorePhotos, setHasMorePhotos] = useState(false);
+  const [photoError, setPhotoError] = useState<string | undefined>();
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | undefined>();
+  const [systemError, setSystemError] = useState<string | undefined>();
+  const [isRefreshingSystemStatus, setIsRefreshingSystemStatus] = useState(false);
   const isBootstrapping = useAppStore((state) => state.isBootstrapping);
   const currentView = useAppStore((state) => state.currentView);
   const setupSteps = useAppStore((state) => state.setupSteps);
@@ -49,7 +66,12 @@ export function App() {
         initialize(boot);
         setProjects(knownProjects);
         setStatusText("Loading project registry...");
-        await getSystemStatus();
+        const status = await getSystemStatus();
+        if (!mounted) {
+          return;
+        }
+        setSystemStatus(status);
+        setSystemError(undefined);
       } catch (error) {
         if (!mounted) {
           return;
@@ -64,6 +86,119 @@ export function App() {
       mounted = false;
     };
   }, [failBootstrap, initialize, setProjects, startBootstrapState]);
+
+  useEffect(() => {
+    if (!currentProject) {
+      setProjectPhotos([]);
+      setIsLoadingMorePhotos(false);
+      setHasMorePhotos(false);
+      setPhotoError(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPhotos(true);
+    setIsLoadingMorePhotos(false);
+    setPhotoError(undefined);
+
+    void listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE })
+      .then((photos) => {
+        if (cancelled) {
+          return;
+        }
+        setProjectPhotos(photos);
+        setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setPhotoError(error instanceof Error ? error.message : "Failed to load project photos.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingPhotos(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProject]);
+
+  useEffect(() => {
+    if (!activeTask || isTerminal(activeTask)) {
+      return;
+    }
+
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const nextTask = await getScanTask(activeTask.id);
+        if (!nextTask || cancelled) {
+          return;
+        }
+
+        setActiveTask(nextTask);
+
+        if (isTerminal(nextTask)) {
+          const refreshedProjects = await listProjects();
+          if (cancelled) {
+            return;
+          }
+          setProjects(refreshedProjects);
+          openProject(nextTask.projectId);
+          const refreshedPhotos = await listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+          if (cancelled) {
+            return;
+          }
+          setProjectPhotos(refreshedPhotos);
+          setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
+          addActivity({
+            id: crypto.randomUUID(),
+            eventType: nextTask.status === "cancelled" ? "scan_cancelled" : nextTask.status === "error" ? "scan_failed" : "scan_completed",
+            severity: nextTask.status === "error" ? "error" : nextTask.failedCount > 0 ? "warning" : "info",
+            message: nextTask.message,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        setActiveTask({
+          id: activeTask.id,
+          projectId: activeTask.projectId,
+          status: "error",
+          progressCurrent: activeTask.progressCurrent,
+          progressTotal: activeTask.progressTotal,
+          message: error instanceof Error ? error.message : "Failed to poll scan task.",
+          indexedCount: activeTask.indexedCount,
+          failedCount: activeTask.failedCount,
+          thumbnailGeneratedCount: activeTask.thumbnailGeneratedCount,
+          thumbnailFailedCount: activeTask.thumbnailFailedCount,
+        });
+      }
+    }, 900);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeTask, addActivity, openProject, setActiveTask, setProjects]);
+
+  async function refreshSystemStatus() {
+    setIsRefreshingSystemStatus(true);
+    try {
+      const nextStatus = await getSystemStatus();
+      setSystemStatus(nextStatus);
+      setSystemError(undefined);
+    } catch (error) {
+      setSystemError(error instanceof Error ? error.message : "Failed to refresh system status.");
+    } finally {
+      setIsRefreshingSystemStatus(false);
+    }
+  }
 
   async function handleCreateProject(input: CreateProjectInput) {
     const project = await createProject(input);
@@ -91,16 +226,29 @@ export function App() {
     try {
       const task = await startScan(currentProject.projectId);
       setActiveTask(task);
-      const refreshedProjects = await listProjects();
-      setProjects(refreshedProjects);
-      openProject(currentProject.projectId);
       addActivity({
         id: crypto.randomUUID(),
-        eventType: "scan_completed",
-        severity: task.failedCount > 0 ? "warning" : "info",
-        message: task.message,
+        eventType: "scan_started",
+        severity: "info",
+        message: `Started recursive indexing for ${currentProject.name}.`,
         createdAt: new Date().toISOString(),
       });
+
+      if (isTerminal(task)) {
+        const refreshedProjects = await listProjects();
+        setProjects(refreshedProjects);
+        openProject(currentProject.projectId);
+        const refreshedPhotos = await listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+        setProjectPhotos(refreshedPhotos);
+        setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
+        addActivity({
+          id: crypto.randomUUID(),
+          eventType: task.status === "cancelled" ? "scan_cancelled" : task.status === "error" ? "scan_failed" : "scan_completed",
+          severity: task.status === "error" ? "error" : task.failedCount > 0 ? "warning" : "info",
+          message: task.message,
+          createdAt: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       setActiveTask({
         id: crypto.randomUUID(),
@@ -111,6 +259,8 @@ export function App() {
         message: error instanceof Error ? error.message : "Scan failed.",
         indexedCount: 0,
         failedCount: 0,
+        thumbnailGeneratedCount: 0,
+        thumbnailFailedCount: 0,
       });
       addActivity({
         id: crypto.randomUUID(),
@@ -119,6 +269,36 @@ export function App() {
         message: error instanceof Error ? error.message : "Scan failed.",
         createdAt: new Date().toISOString(),
       });
+    }
+  }
+
+  async function handleLoadMorePhotos() {
+    if (!currentProject || isLoadingPhotos || isLoadingMorePhotos || !hasMorePhotos) {
+      return;
+    }
+
+    setIsLoadingMorePhotos(true);
+    try {
+      const nextPhotos = await listProjectPhotos(currentProject.projectId, {
+        offset: projectPhotos.length,
+        limit: PHOTO_PAGE_SIZE,
+      });
+
+      setProjectPhotos((existing) => {
+        const known = new Set(existing.map((photo) => photo.id));
+        const merged = [...existing];
+        for (const photo of nextPhotos) {
+          if (!known.has(photo.id)) {
+            merged.push(photo);
+          }
+        }
+        return merged;
+      });
+      setHasMorePhotos(nextPhotos.length === PHOTO_PAGE_SIZE);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Failed to load more project photos.");
+    } finally {
+      setIsLoadingMorePhotos(false);
     }
   }
 
@@ -160,7 +340,7 @@ export function App() {
     setActiveTask(task);
     addActivity({
       id: crypto.randomUUID(),
-      eventType: "scan_cancelled",
+      eventType: "scan_cancellation_requested",
       severity: "warning",
       message: task.message,
       createdAt: new Date().toISOString(),
@@ -181,12 +361,13 @@ export function App() {
       <nav className="grid gap-2 text-sm text-muted">
         <button type="button" onClick={() => setCurrentView("dashboard")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Dashboard</button>
         <button type="button" onClick={() => setCurrentView("workspace")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Workspace</button>
+        <button type="button" onClick={() => setCurrentView("operations")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Operations</button>
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Current total product progress: 87%
+        Current total product progress: 100%
 
-Phase 1 only. The first real indexing slice is live; advanced AI stays locked out.
+Phase 1 complete. Native build validation now passes and the desktop foundation is ready for Phase 2 work.
       </div>
     </div>
   );
@@ -207,12 +388,30 @@ Phase 1 only. The first real indexing slice is live; advanced AI stays locked ou
     content = (
       <ProjectWorkspace
         project={currentProject}
+        photos={projectPhotos}
+        isLoadingPhotos={isLoadingPhotos}
+        isLoadingMorePhotos={isLoadingMorePhotos}
+        hasMorePhotos={hasMorePhotos}
+        photoError={photoError}
         task={activeTask}
         activity={activity}
+        onLoadMorePhotos={handleLoadMorePhotos}
         onStartScan={handleStartScan}
         onPause={handlePauseScan}
         onResume={handleResumeScan}
         onCancel={handleCancelScan}
+      />
+    );
+  } else if (currentView === "operations") {
+    content = (
+      <OperationsPage
+        currentProject={currentProject}
+        activity={activity}
+        task={activeTask}
+        systemStatus={systemStatus}
+        systemError={systemError}
+        isRefreshingSystemStatus={isRefreshingSystemStatus}
+        onRefreshSystemStatus={refreshSystemStatus}
       />
     );
   } else if (currentView === "settings") {

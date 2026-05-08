@@ -4,7 +4,7 @@
 
 Deliver a stable, premium-feeling desktop foundation for local project creation, photo ingestion, scanning, indexing, thumbnails, and progress tracking.
 
-Current total product progress: 87%
+Current total product progress: 100%
 
 ## Phase 1 Deliverables
 
@@ -18,6 +18,9 @@ Current total product progress: 87%
 - Per-project SQLite database initialization
 - Recursive photo scan pipeline
 - Real recursive indexing for supported image discovery and SQLite photo ingestion
+- Background scan task orchestration with polled status updates
+- Bounded cached thumbnail generation with persisted thumbnail records
+- Workspace photo query path with real indexed media records
 - Thumbnail generation pipeline
 - Photo grid page with virtualization
 - Progress controls for pause, resume, and cancel
@@ -84,7 +87,7 @@ Current total product progress: 87%
 
 - Add activity log view
 - Add error report view
-- Add system status placeholder
+- Add dedicated system status and operations review surface
 - Add Python sidecar placeholder status
 
 ## Acceptance Criteria
