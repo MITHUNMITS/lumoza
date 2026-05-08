@@ -8,12 +8,12 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current total product progress: 44%
+Current total product progress: 55%
 
 Immediate repo priorities:
 
 1. Preserve the phase-based build discipline defined below.
-2. Convert the product direction into concrete architecture and implementation artifacts.
+2. Use `docs/architecture.md` and `docs/phase-1-plan.md` as the implementation baseline.
 3. Build only Phase 1 until explicitly instructed to continue.
 
 ## Product Overview

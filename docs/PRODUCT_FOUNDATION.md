@@ -12,8 +12,7 @@ Lumoza now has a defined product direction in `README.md`: an offline-first AI-p
 
 - No validated user research yet
 - No explicit buyer or monetization plan
-- No final Phase 1 architecture document
-- No detailed data model
+- No finalized database schema and migration plan
 - No authentication and licensing strategy
 - No release and packaging execution plan
 - No test and observability baseline
@@ -54,10 +53,17 @@ Lumoza now has a defined product direction in `README.md`: an offline-first AI-p
 
 ### 5. Architecture
 
-- Web app, mobile app, desktop app, or multi-platform?
-- Monolith first or service split?
-- Relational or document database?
-- First-party auth or third-party auth provider?
+Current direction:
+
+- Desktop app with Tauri v2, React, TypeScript, and SQLite
+- Monolith-first desktop architecture with clear service boundaries
+
+Still needs confirmation:
+
+- Exact Tauri plugin set
+- SQLite migration tooling and persistence strategy
+- First-party licensing or third-party auth/provider approach
+- Packaging priority between macOS and Windows
 
 ### 6. Quality
 
@@ -72,9 +78,9 @@ Lumoza now has a defined product direction in `README.md`: an offline-first AI-p
 1. Product brief
 2. User journey map
 3. v1 feature list
-4. System architecture draft
-5. engineering roadmap
-6. release checklist
+4. Phase 1 implementation scaffold
+5. Testing baseline
+6. Release checklist
 
 ## Definition Of Ready For Coding
 
