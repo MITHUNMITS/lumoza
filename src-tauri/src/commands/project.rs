@@ -46,6 +46,23 @@ pub struct ProjectPhotoResponse {
     pub contrast_score: Option<f64>,
     pub resolution_score: Option<f64>,
     pub overall_score: Option<f64>,
+    pub duplicate_group_id: Option<String>,
+    pub burst_group_id: Option<String>,
+    pub ranking_score: Option<f64>,
+    pub selection_label: Option<String>,
+    pub selection_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectAnalysisSummaryResponse {
+    pub analyzed_photo_count: u64,
+    pub average_overall_score: Option<f64>,
+    pub duplicate_group_count: u64,
+    pub burst_group_count: u64,
+    pub keep_count: u64,
+    pub review_count: u64,
+    pub reject_count: u64,
 }
 
 #[tauri::command]
@@ -124,8 +141,33 @@ pub fn list_project_photos(
             contrast_score: photo.contrast_score,
             resolution_score: photo.resolution_score,
             overall_score: photo.overall_score,
+            duplicate_group_id: photo.duplicate_group_id,
+            burst_group_id: photo.burst_group_id,
+            ranking_score: photo.ranking_score,
+            selection_label: photo.selection_label,
+            selection_reason: photo.selection_reason,
         })
         .collect())
+}
+
+#[tauri::command]
+pub fn get_project_analysis_summary(app: AppHandle, project_id: String) -> Result<ProjectAnalysisSummaryResponse, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let summary = database::get_project_analysis_summary(PathBuf::from(&project.project_db_path).as_path())
+        .map_err(|error| error.to_string())?;
+
+    Ok(ProjectAnalysisSummaryResponse {
+        analyzed_photo_count: summary.analyzed_photo_count,
+        average_overall_score: summary.average_overall_score,
+        duplicate_group_count: summary.duplicate_group_count,
+        burst_group_count: summary.burst_group_count,
+        keep_count: summary.keep_count,
+        review_count: summary.review_count,
+        reject_count: summary.reject_count,
+    })
 }
 
 #[tauri::command]

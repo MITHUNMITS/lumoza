@@ -6,7 +6,7 @@ import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
-import { getQualityAnalysisTask, startQualityAnalysis } from "../services/analysisService";
+import { getProjectAnalysisSummary, getQualityAnalysisTask, startQualityAnalysis } from "../services/analysisService";
 import { listProjectPhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
@@ -14,7 +14,7 @@ import { bootstrapApplication, getSystemStatus } from "../services/systemStatusS
 import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
-import type { CreateProjectInput, ProjectPhoto } from "../types/project";
+import type { CreateProjectInput, ProjectAnalysisSummary, ProjectPhoto } from "../types/project";
 import type { QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
@@ -26,6 +26,7 @@ function isTerminal(task?: ScanTask | QualityAnalysisTask) {
 export function App() {
   const [statusText, setStatusText] = useState("Preparing desktop foundation...");
   const [projectPhotos, setProjectPhotos] = useState<ProjectPhoto[]>([]);
+  const [analysisSummary, setAnalysisSummary] = useState<ProjectAnalysisSummary | undefined>();
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
   const [hasMorePhotos, setHasMorePhotos] = useState(false);
@@ -93,6 +94,7 @@ export function App() {
   useEffect(() => {
     if (!currentProject) {
       setProjectPhotos([]);
+      setAnalysisSummary(undefined);
       setIsLoadingMorePhotos(false);
       setHasMorePhotos(false);
       setPhotoError(undefined);
@@ -104,12 +106,16 @@ export function App() {
     setIsLoadingMorePhotos(false);
     setPhotoError(undefined);
 
-    void listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE })
-      .then((photos) => {
+    void Promise.all([
+      listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
+      getProjectAnalysisSummary(currentProject.projectId),
+    ])
+      .then(([photos, summary]) => {
         if (cancelled) {
           return;
         }
         setProjectPhotos(photos);
+        setAnalysisSummary(summary);
         setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
       })
       .catch((error) => {
@@ -151,11 +157,15 @@ export function App() {
           }
           setProjects(refreshedProjects);
           openProject(nextTask.projectId);
-          const refreshedPhotos = await listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+          const [refreshedPhotos, refreshedSummary] = await Promise.all([
+            listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
+            getProjectAnalysisSummary(nextTask.projectId),
+          ]);
           if (cancelled) {
             return;
           }
           setProjectPhotos(refreshedPhotos);
+          setAnalysisSummary(refreshedSummary);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
             id: crypto.randomUUID(),
@@ -206,11 +216,15 @@ export function App() {
         setActiveAnalysisTask(nextTask);
 
         if (isTerminal(nextTask)) {
-          const refreshedPhotos = await listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+          const [refreshedPhotos, refreshedSummary] = await Promise.all([
+            listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
+            getProjectAnalysisSummary(nextTask.projectId),
+          ]);
           if (cancelled) {
             return;
           }
           setProjectPhotos(refreshedPhotos);
+          setAnalysisSummary(refreshedSummary);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
             id: crypto.randomUUID(),
@@ -234,6 +248,11 @@ export function App() {
           analyzedCount: activeAnalysisTask.analyzedCount,
           failedCount: activeAnalysisTask.failedCount,
           averageScore: activeAnalysisTask.averageScore,
+          duplicateGroupCount: activeAnalysisTask.duplicateGroupCount,
+          burstGroupCount: activeAnalysisTask.burstGroupCount,
+          keepCount: activeAnalysisTask.keepCount,
+          reviewCount: activeAnalysisTask.reviewCount,
+          rejectCount: activeAnalysisTask.rejectCount,
         });
       }
     }, 900);
@@ -295,8 +314,12 @@ export function App() {
         const refreshedProjects = await listProjects();
         setProjects(refreshedProjects);
         openProject(currentProject.projectId);
-        const refreshedPhotos = await listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+        const [refreshedPhotos, refreshedSummary] = await Promise.all([
+          listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
+          getProjectAnalysisSummary(currentProject.projectId),
+        ]);
         setProjectPhotos(refreshedPhotos);
+        setAnalysisSummary(refreshedSummary);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
           id: crypto.randomUUID(),
@@ -346,8 +369,12 @@ export function App() {
       });
 
       if (isTerminal(task)) {
-        const refreshedPhotos = await listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+        const [refreshedPhotos, refreshedSummary] = await Promise.all([
+          listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
+          getProjectAnalysisSummary(currentProject.projectId),
+        ]);
         setProjectPhotos(refreshedPhotos);
+        setAnalysisSummary(refreshedSummary);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
           id: crypto.randomUUID(),
@@ -368,6 +395,11 @@ export function App() {
         analyzedCount: 0,
         failedCount: 0,
         averageScore: 0,
+        duplicateGroupCount: 0,
+        burstGroupCount: 0,
+        keepCount: 0,
+        reviewCount: 0,
+        rejectCount: 0,
       });
       addActivity({
         id: crypto.randomUUID(),
@@ -463,7 +495,7 @@ export function App() {
       <div>
         <p className="text-sm uppercase tracking-[0.36em] text-accent/80">Lumoza</p>
         <h1 className="mt-3 text-3xl font-semibold text-text">Studio</h1>
-        <p className="mt-3 text-sm leading-7 text-muted">Offline-first AI curation now moves from foundation into fast technical analysis.</p>
+        <p className="mt-3 text-sm leading-7 text-muted">Offline-first AI curation now moves from scoring into first-pass ranking and selection guidance.</p>
       </div>
       <nav className="grid gap-2 text-sm text-muted">
         <button type="button" onClick={() => setCurrentView("dashboard")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Dashboard</button>
@@ -472,9 +504,10 @@ export function App() {
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Full product progress: 31%
+        Full product progress: 39%
+        Current phase progress: 55% (Phase 2)
 
-Phase 1 is complete. Phase 2 is in progress, with technical quality scoring active and duplicates, bursts, ranking, face intelligence, polish, and release work still ahead.
+Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping, and a first explainable ranking pass are active, while face intelligence, deeper ranking, polish, and release work still remain.
       </div>
     </div>
   );
@@ -483,7 +516,7 @@ Phase 1 is complete. Phase 2 is in progress, with technical quality scoring acti
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 fast AI engine</p>
-        <h2 className="mt-2 text-3xl font-semibold text-text">Technical quality analysis and scoring</h2>
+        <h2 className="mt-2 text-3xl font-semibold text-text">Technical quality, grouping, and first-pass ranking</h2>
       </div>
       <CreateProject onCreate={handleCreateProject} />
     </div>
@@ -496,6 +529,7 @@ Phase 1 is complete. Phase 2 is in progress, with technical quality scoring acti
       <ProjectWorkspace
         project={currentProject}
         photos={projectPhotos}
+        analysisSummary={analysisSummary}
         isLoadingPhotos={isLoadingPhotos}
         isLoadingMorePhotos={isLoadingMorePhotos}
         hasMorePhotos={hasMorePhotos}
@@ -515,6 +549,7 @@ Phase 1 is complete. Phase 2 is in progress, with technical quality scoring acti
     content = (
       <OperationsPage
         currentProject={currentProject}
+        analysisSummary={analysisSummary}
         activity={activity}
         task={activeTask}
         analysisTask={activeAnalysisTask}

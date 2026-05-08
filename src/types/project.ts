@@ -12,6 +12,16 @@ export interface ProjectSummary {
   lastOpenedAt?: string;
 }
 
+export interface ProjectAnalysisSummary {
+  analyzedPhotoCount: number;
+  averageOverallScore?: number;
+  duplicateGroupCount: number;
+  burstGroupCount: number;
+  keepCount: number;
+  reviewCount: number;
+  rejectCount: number;
+}
+
 export interface ProjectPhotoQualitySummary {
   sharpnessScore?: number;
   exposureScore?: number;
@@ -19,6 +29,8 @@ export interface ProjectPhotoQualitySummary {
   resolutionScore?: number;
   overallScore?: number;
 }
+
+export type SelectionLabel = "keep" | "review" | "reject";
 
 export interface ProjectPhoto {
   id: string;
@@ -32,6 +44,11 @@ export interface ProjectPhoto {
   thumbnailStatus: ThumbnailStatus;
   thumbnailCachePath?: string;
   quality?: ProjectPhotoQualitySummary;
+  duplicateGroupId?: string;
+  burstGroupId?: string;
+  rankingScore?: number;
+  selectionLabel?: SelectionLabel;
+  selectionReason?: string;
 }
 
 export interface CreateProjectInput {

@@ -16,5 +16,5 @@ export const useScanStore = create<ScanState>((set) => ({
   activity: [],
   setActiveTask: (task) => set({ activeTask: task }),
   setActiveAnalysisTask: (task) => set({ activeAnalysisTask: task }),
-  addActivity: (item) => set((state) => ({ activity: [item, ...state.activity].slice(0, 20) })),
+  addActivity: (item) => set((state) => ({ activity: [item, ...state.activity].slice(0, 24) })),
 }));

@@ -30,6 +30,11 @@ export interface QualityAnalysisTask {
   analyzedCount: number;
   failedCount: number;
   averageScore: number;
+  duplicateGroupCount: number;
+  burstGroupCount: number;
+  keepCount: number;
+  reviewCount: number;
+  rejectCount: number;
 }
 
 export interface ActivityItem {

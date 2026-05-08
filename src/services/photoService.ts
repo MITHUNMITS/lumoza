@@ -23,6 +23,11 @@ interface RawProjectPhoto {
   contrastScore?: number;
   resolutionScore?: number;
   overallScore?: number;
+  duplicateGroupId?: string;
+  burstGroupId?: string;
+  rankingScore?: number;
+  selectionLabel?: "keep" | "review" | "reject";
+  selectionReason?: string;
 }
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -36,7 +41,7 @@ function createMockPhotos(projectId: string, count: number): ProjectPhoto[] {
     fileSizeBytes: 1_800_000 + index * 1024,
     width: 4200,
     height: 2800,
-    modifiedAt: new Date(Date.now() - index * 86_400_000).toISOString(),
+    modifiedAt: new Date(Date.now() - index * 2_000).toISOString(),
     thumbnailStatus: "generated",
     thumbnailCachePath: `/mock-cache/${projectId}/thumb-${index + 1}.jpg`,
     quality: {
@@ -46,6 +51,11 @@ function createMockPhotos(projectId: string, count: number): ProjectPhoto[] {
       resolutionScore: 0.88,
       overallScore: 0.74 + (index % 5) * 0.03,
     },
+    duplicateGroupId: index % 11 === 0 ? `duplicate-${Math.floor(index / 11)}` : undefined,
+    burstGroupId: index % 9 < 3 ? `burst-${Math.floor(index / 9)}` : undefined,
+    rankingScore: 0.48 + (index % 7) * 0.07,
+    selectionLabel: index % 7 < 2 ? "keep" : index % 7 < 5 ? "review" : "reject",
+    selectionReason: index % 7 < 2 ? "strong technical quality; standalone frame" : index % 7 < 5 ? "usable technical quality; secondary burst frame" : "weak technical quality; lower-ranked duplicate frame",
   }));
 }
 
@@ -61,15 +71,25 @@ function mapPhoto(photo: RawProjectPhoto): ProjectPhoto {
     modifiedAt: photo.modifiedAt,
     thumbnailStatus: photo.thumbnailStatus,
     thumbnailCachePath: photo.thumbnailCachePath,
-    quality: photo.overallScore === undefined && photo.sharpnessScore === undefined && photo.exposureScore === undefined && photo.contrastScore === undefined && photo.resolutionScore === undefined
-      ? undefined
-      : {
-          sharpnessScore: photo.sharpnessScore,
-          exposureScore: photo.exposureScore,
-          contrastScore: photo.contrastScore,
-          resolutionScore: photo.resolutionScore,
-          overallScore: photo.overallScore,
-        },
+    duplicateGroupId: photo.duplicateGroupId,
+    burstGroupId: photo.burstGroupId,
+    rankingScore: photo.rankingScore,
+    selectionLabel: photo.selectionLabel,
+    selectionReason: photo.selectionReason,
+    quality:
+      photo.overallScore === undefined &&
+      photo.sharpnessScore === undefined &&
+      photo.exposureScore === undefined &&
+      photo.contrastScore === undefined &&
+      photo.resolutionScore === undefined
+        ? undefined
+        : {
+            sharpnessScore: photo.sharpnessScore,
+            exposureScore: photo.exposureScore,
+            contrastScore: photo.contrastScore,
+            resolutionScore: photo.resolutionScore,
+            overallScore: photo.overallScore,
+          },
   };
 }
 

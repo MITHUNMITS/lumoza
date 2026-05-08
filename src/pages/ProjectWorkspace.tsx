@@ -1,12 +1,13 @@
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { getThumbnailPipelineSummary } from "../services/thumbnailService";
-import type { ProjectPhoto, ProjectSummary } from "../types/project";
+import type { ProjectAnalysisSummary, ProjectPhoto, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
 
 interface ProjectWorkspaceProps {
   project: ProjectSummary;
   photos: ProjectPhoto[];
+  analysisSummary?: ProjectAnalysisSummary;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
   hasMorePhotos: boolean;
@@ -34,6 +35,7 @@ function averageQualityScore(photos: ProjectPhoto[]) {
 export function ProjectWorkspace({
   project,
   photos,
+  analysisSummary,
   isLoadingPhotos,
   isLoadingMorePhotos,
   hasMorePhotos,
@@ -49,7 +51,13 @@ export function ProjectWorkspace({
   onCancel,
 }: ProjectWorkspaceProps) {
   const thumbnailSummary = getThumbnailPipelineSummary(task);
-  const averageScore = averageQualityScore(photos);
+  const averageScore = analysisSummary?.averageOverallScore ?? averageQualityScore(photos);
+  const duplicateGroupCount = analysisTask?.duplicateGroupCount ?? analysisSummary?.duplicateGroupCount ?? 0;
+  const burstGroupCount = analysisTask?.burstGroupCount ?? analysisSummary?.burstGroupCount ?? 0;
+  const keepCount = analysisTask?.keepCount ?? analysisSummary?.keepCount ?? 0;
+  const reviewCount = analysisTask?.reviewCount ?? analysisSummary?.reviewCount ?? 0;
+  const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
+  const analyzedCount = analysisTask?.analyzedCount ?? analysisSummary?.analyzedPhotoCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
@@ -80,18 +88,42 @@ export function ProjectWorkspace({
       <section className="grid gap-5">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
         <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Technical quality</p>
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">Analysis and ranking</p>
           <p className="mt-3 text-sm leading-7 text-muted">
-            {analysisTask ? analysisTask.message : averageScore !== undefined ? `Latest average technical score ${(averageScore * 100).toFixed(0)}%.` : "Run Phase 2 analysis to compute technical quality metrics for this project."}
+            {analysisTask
+              ? analysisTask.message
+              : averageScore !== undefined
+                ? `Latest average technical score ${(averageScore * 100).toFixed(0)}%.`
+                : "Run Phase 2 analysis to compute technical quality metrics for this project."}
           </p>
           <div className="mt-4 grid gap-2 text-sm text-muted">
             <div className="flex items-center justify-between">
               <span>Analyzed photos</span>
-              <span className="text-text">{analysisTask?.analyzedCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length}</span>
+              <span className="text-text">{analyzedCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Average score</span>
               <span className="text-text">{((analysisTask?.averageScore ?? averageScore ?? 0) * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Duplicate groups</span>
+              <span className="text-text">{duplicateGroupCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Burst groups</span>
+              <span className="text-text">{burstGroupCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Keep picks</span>
+              <span className="text-text">{keepCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Review picks</span>
+              <span className="text-text">{reviewCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Reject picks</span>
+              <span className="text-text">{rejectCount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Analysis failures</span>

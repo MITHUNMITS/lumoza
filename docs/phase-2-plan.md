@@ -6,8 +6,11 @@ Deliver the first real intelligence layer for Lumoza Studio: fast technical-qual
 
 Current phase status: in progress
 
-Phase 2 slice progress: early implementation
-Full product progress: 31% overall
+Phase 2 progress: 55% complete
+Phase 2 slice progress: technical quality scoring complete, duplicate and burst grouping active, first explainable ranking pass active
+Full product progress: 39% overall
+
+Duplicate and burst grouping now persist into the Phase 2 analysis model, and the first explainable ranking pass now produces keep, review, and reject recommendations.
 
 ## Phase 2 Deliverables
 
@@ -57,9 +60,9 @@ Full product progress: 31% overall
 
 ### 5. Phase 2 Next Steps After This Slice
 
-- Duplicate grouping implementation
-- Burst grouping implementation
-- First explainable ranking pass
+- Refine duplicate grouping beyond the first deterministic pass
+- Refine burst grouping beyond the first deterministic pass
+- Refine ranking confidence and album-selection logic
 
 ## Acceptance Criteria For The First Phase 2 Slice
 

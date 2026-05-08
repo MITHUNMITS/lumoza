@@ -1,9 +1,10 @@
-import { Activity, AlertTriangle, BrainCircuit, RefreshCcw, Server, ShieldCheck } from "lucide-react";
-import type { ProjectSummary } from "../types/project";
+import { Activity, AlertTriangle, BrainCircuit, Layers3, RefreshCcw, Server, ShieldCheck } from "lucide-react";
+import type { ProjectAnalysisSummary, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 interface OperationsPageProps {
   currentProject?: ProjectSummary;
+  analysisSummary?: ProjectAnalysisSummary;
   activity: ActivityItem[];
   task?: ScanTask;
   analysisTask?: QualityAnalysisTask;
@@ -51,6 +52,7 @@ function formatEventLabel(eventType: string) {
 
 export function OperationsPage({
   currentProject,
+  analysisSummary,
   activity,
   task,
   analysisTask,
@@ -62,6 +64,12 @@ export function OperationsPage({
   const incidents = activity.filter((item) => item.severity !== "info");
   const errors = activity.filter((item) => item.severity === "error");
   const warnings = activity.filter((item) => item.severity === "warning");
+  const duplicateGroupCount = analysisTask?.duplicateGroupCount ?? analysisSummary?.duplicateGroupCount ?? 0;
+  const burstGroupCount = analysisTask?.burstGroupCount ?? analysisSummary?.burstGroupCount ?? 0;
+  const keepCount = analysisTask?.keepCount ?? analysisSummary?.keepCount ?? 0;
+  const reviewCount = analysisTask?.reviewCount ?? analysisSummary?.reviewCount ?? 0;
+  const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
+  const averageScore = analysisTask?.averageScore ?? analysisSummary?.averageOverallScore ?? 0;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -206,8 +214,43 @@ export function OperationsPage({
             <BrainCircuit className="h-5 w-5" />
             <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 analysis</p>
           </div>
+          <div className="mt-4 grid gap-3 rounded-[20px] border border-white/8 bg-ink/30 p-4 text-sm text-muted">
+            <div className="flex items-center justify-between">
+              <span>Average score</span>
+              <span className="text-text">{(averageScore * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Duplicate groups</span>
+              <span className="text-text">{duplicateGroupCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Burst groups</span>
+              <span className="text-text">{burstGroupCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Keep picks</span>
+              <span className="text-text">{keepCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Review picks</span>
+              <span className="text-text">{reviewCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Reject picks</span>
+              <span className="text-text">{rejectCount}</span>
+            </div>
+          </div>
+          <div className="mt-5 rounded-[20px] border border-white/8 bg-card/50 p-4 text-sm text-muted">
+            <div className="flex items-center gap-3 text-text">
+              <Layers3 className="h-4 w-4" />
+              <span>Grouping summary</span>
+            </div>
+            <p className="mt-3 leading-7">
+              Duplicate grouping now clusters near-identical frames using perceptual similarity, burst grouping clusters closely timed capture sequences, and the first ranking pass converts that analysis into explainable keep, review, and reject recommendations.
+            </p>
+          </div>
           {analysisTask ? (
-            <div className="mt-4 space-y-3 text-sm text-muted">
+            <div className="mt-5 space-y-3 text-sm text-muted">
               <div className="flex items-center justify-between">
                 <span>Status</span>
                 <span className="text-text">{analysisTask.status}</span>
@@ -219,10 +262,6 @@ export function OperationsPage({
               <div className="flex items-center justify-between">
                 <span>Analyzed</span>
                 <span className="text-text">{analysisTask.analyzedCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Average score</span>
-                <span className="text-text">{(analysisTask.averageScore * 100).toFixed(0)}%</span>
               </div>
               <p className="rounded-[18px] border border-white/8 bg-ink/30 p-4 leading-7 text-text">{analysisTask.message}</p>
             </div>

@@ -45,6 +45,11 @@ pub fn start_quality_analysis(
         analyzed_count: 0,
         failed_count: 0,
         average_score: 0.0,
+        duplicate_group_count: 0,
+        burst_group_count: 0,
+        keep_count: 0,
+        review_count: 0,
+        reject_count: 0,
     };
 
     let control = Arc::new(ScanTaskControl::default());
@@ -107,12 +112,21 @@ fn run_quality_analysis_task(
     } else {
         result.metrics.iter().map(|entry| entry.overall_score).sum::<f64>() / result.metrics.len() as f64
     };
+    let duplicate_group_count = result.duplicate_groups.len() as u64;
+    let burst_group_count = result.burst_groups.len() as u64;
+    let keep_count = result.curation_scores.iter().filter(|score| score.selection_label == "keep").count() as u64;
+    let review_count = result.curation_scores.iter().filter(|score| score.selection_label == "review").count() as u64;
+    let reject_count = result.curation_scores.iter().filter(|score| score.selection_label == "reject").count() as u64;
 
     let persist_result = database::persist_quality_analysis(
         Path::new(&project_db_path),
         &analysis_run_id,
         &result.metrics,
+        &result.duplicate_groups,
+        &result.burst_groups,
+        &result.curation_scores,
         failed_count,
+        result.cancelled,
     );
 
     match persist_result {
@@ -123,17 +137,32 @@ fn run_quality_analysis_task(
                 task.analyzed_count = analyzed_count;
                 task.failed_count = failed_count;
                 task.average_score = average_score;
+                task.duplicate_group_count = duplicate_group_count;
+                task.burst_group_count = burst_group_count;
+                task.keep_count = keep_count;
+                task.review_count = review_count;
+                task.reject_count = reject_count;
                 task.message = if result.cancelled {
                     format!(
-                        "Cancelled after analyzing {} photos. Average score {:.0}%.",
+                        "Cancelled after analyzing {} photos. Average score {:.0}%. Found {} duplicate groups, {} burst groups, and ranked {} keep / {} review / {} reject before stop.",
                         analyzed_count,
                         average_score * 100.0,
+                        duplicate_group_count,
+                        burst_group_count,
+                        keep_count,
+                        review_count,
+                        reject_count,
                     )
                 } else {
                     format!(
-                        "Analyzed {} photos with average score {:.0}%. {} failures.",
+                        "Analyzed {} photos with average score {:.0}%. Found {} duplicate groups, {} burst groups, ranked {} keep / {} review / {} reject, and recorded {} failures.",
                         analyzed_count,
                         average_score * 100.0,
+                        duplicate_group_count,
+                        burst_group_count,
+                        keep_count,
+                        review_count,
+                        reject_count,
                         failed_count,
                     )
                 };

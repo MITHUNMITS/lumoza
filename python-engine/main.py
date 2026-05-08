@@ -16,6 +16,8 @@ def capabilities_payload():
             "heartbeat",
             "healthcheck",
             "technical-quality-contract",
+            "duplicate-burst-contract",
+            "selection-ranking-contract",
         ],
     }
 signal.signal(signal.SIGINT, handle_signal)

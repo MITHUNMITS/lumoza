@@ -10,6 +10,8 @@ print(
                 "heartbeat",
                 "healthcheck",
                 "technical-quality-contract",
+                "duplicate-burst-contract",
+            "selection-ranking-contract",
             ],
         }
     )

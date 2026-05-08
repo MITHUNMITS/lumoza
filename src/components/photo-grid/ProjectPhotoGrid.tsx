@@ -168,7 +168,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
         </div>
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted">
           <span className="rounded-full bg-white/6 px-3 py-1">{photos.length}{hasMore ? "+" : ""} loaded</span>
-          <span className="rounded-full bg-white/6 px-3 py-1">Phase 2 scores</span>
+          <span className="rounded-full bg-white/6 px-3 py-1">Grouping active</span>
         </div>
       </div>
 
@@ -182,12 +182,12 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
               <span className="mt-2 block text-text">Windowed rendering for larger project sets</span>
             </div>
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Thumbnail source</span>
-              <span className="mt-2 block text-text">App-managed cache previews when available</span>
+              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Technical analysis</span>
+              <span className="mt-2 block text-text">Scores, duplicate groups, and burst candidates now surface together</span>
             </div>
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Analysis state</span>
-              <span className="mt-2 block text-text">Technical quality scores surface as soon as analysis results exist</span>
+              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Scroll state</span>
+              <span className="mt-2 block text-text">{isLoadingMore ? "Loading more indexed media..." : hasMore ? "More records will load near the bottom" : "All loaded records are currently in memory"}</span>
             </div>
           </div>
 
@@ -196,15 +196,33 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
               {virtualItems.map(({ photo, style }) => {
                 const previewSrc = resolvePreviewSrc(photo);
                 const overallScore = photo.quality?.overallScore;
+                const rankingScore = photo.rankingScore;
 
                 return (
                   <article key={photo.id} style={{ ...style, height: `${CARD_HEIGHT}px` }} className="flex flex-col overflow-hidden rounded-[20px] border border-white/8 bg-panel/80 shadow-soft">
                     <div className="relative bg-gradient-to-br from-white/10 via-white/5 to-transparent" style={{ height: `${PREVIEW_HEIGHT}px` }}>
-                      {overallScore !== undefined ? (
-                        <span className="absolute left-3 top-3 rounded-full bg-ink/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-                          {(overallScore * 100).toFixed(0)} quality
-                        </span>
-                      ) : null}
+                      <div className="absolute left-3 top-3 flex flex-wrap gap-2 z-10">
+                        {overallScore !== undefined ? (
+                          <span className="rounded-full bg-ink/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                            {(overallScore * 100).toFixed(0)} quality
+                          </span>
+                        ) : null}
+                        {photo.selectionLabel ? (
+                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${photo.selectionLabel === "keep" ? "bg-accent/18 text-accent" : photo.selectionLabel === "review" ? "bg-white/12 text-text" : "bg-danger/18 text-danger"}`}>
+                            {photo.selectionLabel}
+                          </span>
+                        ) : null}
+                        {photo.duplicateGroupId ? (
+                          <span className="rounded-full bg-warning/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-warning">
+                            duplicate set
+                          </span>
+                        ) : null}
+                        {photo.burstGroupId ? (
+                          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-text">
+                            burst set
+                          </span>
+                        ) : null}
+                      </div>
                       {previewSrc ? (
                         <img
                           src={previewSrc}
@@ -227,6 +245,10 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
                       <div className="flex items-center justify-between gap-3 text-xs text-subtle">
                         <span className="uppercase">{photo.extension}</span>
                         <span>{photo.modifiedAt ? new Date(photo.modifiedAt).toLocaleDateString() : "Unknown date"}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs text-subtle">
+                        <span>{photo.selectionReason ?? "Selection reason pending"}</span>
+                        <span>{rankingScore !== undefined ? `${(rankingScore * 100).toFixed(0)} rank` : "Unranked"}</span>
                       </div>
                     </div>
                   </article>

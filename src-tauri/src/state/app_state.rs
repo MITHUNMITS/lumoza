@@ -38,6 +38,11 @@ pub struct QualityAnalysisTaskSnapshot {
     pub analyzed_count: u64,
     pub failed_count: u64,
     pub average_score: f64,
+    pub duplicate_group_count: u64,
+    pub burst_group_count: u64,
+    pub keep_count: u64,
+    pub review_count: u64,
+    pub reject_count: u64,
 }
 
 impl QualityAnalysisTaskSnapshot {

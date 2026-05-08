@@ -518,3 +518,5 @@ These are still unresolved and should be fixed before heavy implementation:
 ## Phase 2 Extension Note
 
 The first Phase 2 slice adds a persisted technical-quality pipeline on top of the Phase 1 photo index. This slice introduces `analysis_runs`, `photo_quality_metrics`, and duplicate-group scaffold tables, plus a background native analysis task that computes sharpness, exposure, contrast, resolution, and overall quality scores for indexed photos.
+
+The next Phase 2 extension now adds a first deterministic duplicate and burst grouping layer plus a first explainable ranking pass. Duplicate grouping is based on perceptual similarity and file-size proximity, burst grouping is based on short capture-time windows plus filename or visual affinity, and the ranking layer converts those signals into initial keep, review, and reject recommendations. This remains an intentionally fast local-first pass and not the final ranking engine.

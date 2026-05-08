@@ -7,15 +7,16 @@ use rusqlite::{params, Connection, Transaction};
 use crate::{
     commands::project::ProjectSummary,
     services::{
-        quality_analyzer::PhotoQualityMetricsRecord,
+        quality_analyzer::{PhotoCurationScoreRecord, PhotoGroupingRecord, PhotoQualityMetricsRecord},
         scan_indexer::IndexedPhoto,
         thumbnail_pipeline::GeneratedThumbnail,
     },
 };
 
-const MIGRATIONS: [&str; 2] = [
+const MIGRATIONS: [&str; 3] = [
     include_str!("../../migrations/0001_init.sql"),
     include_str!("../../migrations/0002_analysis.sql"),
+    include_str!("../../migrations/0003_ranking.sql"),
 ];
 
 #[derive(Debug)]
@@ -41,12 +42,31 @@ pub struct ProjectPhotoRecord {
     pub contrast_score: Option<f64>,
     pub resolution_score: Option<f64>,
     pub overall_score: Option<f64>,
+    pub duplicate_group_id: Option<String>,
+    pub burst_group_id: Option<String>,
+    pub ranking_score: Option<f64>,
+    pub selection_label: Option<String>,
+    pub selection_reason: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct ProjectAnalysisSummaryRecord {
+    pub analyzed_photo_count: u64,
+    pub average_overall_score: Option<f64>,
+    pub duplicate_group_count: u64,
+    pub burst_group_count: u64,
+    pub keep_count: u64,
+    pub review_count: u64,
+    pub reject_count: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct AnalysisPhotoRecord {
     pub photo_id: String,
     pub absolute_path: String,
+    pub filename: String,
+    pub modified_at: Option<String>,
+    pub file_size_bytes: u64,
 }
 
 pub fn initialize_project_database(path: &Path) -> anyhow::Result<()> {
@@ -88,6 +108,7 @@ pub fn persist_scan(
         [],
     )?;
     transaction.execute("DELETE FROM duplicate_groups", [])?;
+    transaction.execute("DELETE FROM photo_curation_scores", [])?;
     transaction.execute("DELETE FROM photo_quality_metrics", [])?;
     transaction.execute("DELETE FROM analysis_runs", [])?;
     transaction.execute(
@@ -187,10 +208,20 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
             photo_quality_metrics.exposure_score,
             photo_quality_metrics.contrast_score,
             photo_quality_metrics.resolution_score,
-            photo_quality_metrics.overall_score
+            photo_quality_metrics.overall_score,
+            duplicate_groups.id,
+            burst_groups.id,
+            photo_curation_scores.ranking_score,
+            photo_curation_scores.selection_label,
+            photo_curation_scores.selection_reason
          FROM photos
          LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
          LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
+         LEFT JOIN photo_curation_scores ON photo_curation_scores.photo_id = photos.id
+         LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
+         LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
          ORDER BY COALESCE(photos.modified_at, '') DESC, photos.filename ASC
          LIMIT ?1 OFFSET ?2",
     )?;
@@ -212,6 +243,11 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
             contrast_score: row.get::<_, Option<f64>>(12)?,
             resolution_score: row.get::<_, Option<f64>>(13)?,
             overall_score: row.get::<_, Option<f64>>(14)?,
+            duplicate_group_id: row.get::<_, Option<String>>(15)?,
+            burst_group_id: row.get::<_, Option<String>>(16)?,
+            ranking_score: row.get::<_, Option<f64>>(17)?,
+            selection_label: row.get::<_, Option<String>>(18)?,
+            selection_reason: row.get::<_, Option<String>>(19)?,
         })
     })?;
 
@@ -223,17 +259,77 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
     Ok(photos)
 }
 
+pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalysisSummaryRecord> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+
+    let analyzed_photo_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_quality_metrics",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let average_overall_score = connection.query_row(
+        "SELECT AVG(overall_score) FROM photo_quality_metrics",
+        [],
+        |row| row.get::<_, Option<f64>>(0),
+    )?;
+
+    let duplicate_group_count = connection.query_row(
+        "SELECT COUNT(*) FROM duplicate_groups WHERE grouping_type = 'duplicate'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let burst_group_count = connection.query_row(
+        "SELECT COUNT(*) FROM duplicate_groups WHERE grouping_type = 'burst'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let keep_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_curation_scores WHERE selection_label = 'keep'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let review_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_curation_scores WHERE selection_label = 'review'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let reject_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_curation_scores WHERE selection_label = 'reject'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    Ok(ProjectAnalysisSummaryRecord {
+        analyzed_photo_count,
+        average_overall_score,
+        duplicate_group_count,
+        burst_group_count,
+        keep_count,
+        review_count,
+        reject_count,
+    })
+}
+
 pub fn list_analysis_photo_records(path: &Path) -> anyhow::Result<Vec<AnalysisPhotoRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let mut statement = connection.prepare(
-        "SELECT id, absolute_path FROM photos ORDER BY COALESCE(modified_at, '') DESC, filename ASC",
+        "SELECT id, absolute_path, filename, modified_at, file_size_bytes FROM photos ORDER BY COALESCE(modified_at, '') DESC, filename ASC",
     )?;
 
     let rows = statement.query_map([], |row| {
         Ok(AnalysisPhotoRecord {
             photo_id: row.get::<_, String>(0)?,
             absolute_path: row.get::<_, String>(1)?,
+            filename: row.get::<_, String>(2)?,
+            modified_at: row.get::<_, Option<String>>(3)?,
+            file_size_bytes: row.get::<_, i64>(4)? as u64,
         })
     })?;
 
@@ -249,12 +345,20 @@ pub fn persist_quality_analysis(
     path: &Path,
     analysis_run_id: &str,
     metrics: &[PhotoQualityMetricsRecord],
+    duplicate_groups: &[PhotoGroupingRecord],
+    burst_groups: &[PhotoGroupingRecord],
+    curation_scores: &[PhotoCurationScoreRecord],
     failed_count: u64,
+    cancelled: bool,
 ) -> anyhow::Result<()> {
     let mut connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let transaction = connection.transaction()?;
     let now = Utc::now().to_rfc3339();
+
+    transaction.execute("DELETE FROM duplicate_group_members", [])?;
+    transaction.execute("DELETE FROM duplicate_groups", [])?;
+    transaction.execute("DELETE FROM photo_curation_scores", [])?;
 
     transaction.execute(
         "INSERT INTO analysis_runs (id, analysis_type, status, engine, engine_version, photos_total, photos_processed, failed_count, started_at, ended_at)
@@ -262,7 +366,7 @@ pub fn persist_quality_analysis(
         params![
             analysis_run_id,
             "technical_quality",
-            "completed",
+            if cancelled { "cancelled" } else { "completed" },
             "rust-native-fast-path",
             env!("CARGO_PKG_VERSION"),
             (metrics.len() as u64 + failed_count) as i64,
@@ -309,6 +413,45 @@ pub fn persist_quality_analysis(
         }
     }
 
+    persist_group_records(&transaction, analysis_run_id, duplicate_groups, "duplicate", &now)?;
+    persist_group_records(&transaction, analysis_run_id, burst_groups, "burst", &now)?;
+
+    {
+        let mut statement = transaction.prepare(
+            "INSERT INTO photo_curation_scores (
+                photo_id,
+                analysis_run_id,
+                ranking_score,
+                selection_label,
+                selection_reason,
+                duplicate_penalty,
+                burst_penalty,
+                created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(photo_id) DO UPDATE SET
+               analysis_run_id = excluded.analysis_run_id,
+               ranking_score = excluded.ranking_score,
+               selection_label = excluded.selection_label,
+               selection_reason = excluded.selection_reason,
+               duplicate_penalty = excluded.duplicate_penalty,
+               burst_penalty = excluded.burst_penalty,
+               created_at = excluded.created_at",
+        )?;
+
+        for score in curation_scores {
+            statement.execute(params![
+                score.photo_id.as_str(),
+                analysis_run_id,
+                score.ranking_score,
+                score.selection_label.as_str(),
+                score.selection_reason.as_str(),
+                score.duplicate_penalty,
+                score.burst_penalty,
+                now.as_str(),
+            ])?;
+        }
+    }
+
     transaction.execute(
         "INSERT INTO activity_log (id, event_type, severity, message, payload_json, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -316,13 +459,61 @@ pub fn persist_quality_analysis(
             format!("analysis-run-{analysis_run_id}"),
             "quality_analysis_completed",
             if failed_count > 0 { "warning" } else { "info" },
-            format!("Analyzed {} photos for technical quality.", metrics.len()),
-            format!(r#"{{"failedCount": {}, "analyzedCount": {}}}"#, failed_count, metrics.len()),
+            format!(
+                "Analyzed {} photos, found {} duplicate groups, {} burst groups, and ranked {} keep / {} review / {} reject decisions.",
+                metrics.len(),
+                duplicate_groups.len(),
+                burst_groups.len(),
+                curation_scores.iter().filter(|score| score.selection_label == "keep").count(),
+                curation_scores.iter().filter(|score| score.selection_label == "review").count(),
+                curation_scores.iter().filter(|score| score.selection_label == "reject").count(),
+            ),
+            format!(
+                r#"{{"failedCount": {}, "analyzedCount": {}, "duplicateGroupCount": {}, "burstGroupCount": {}, "keepCount": {}, "reviewCount": {}, "rejectCount": {}}}"#,
+                failed_count,
+                metrics.len(),
+                duplicate_groups.len(),
+                burst_groups.len(),
+                curation_scores.iter().filter(|score| score.selection_label == "keep").count(),
+                curation_scores.iter().filter(|score| score.selection_label == "review").count(),
+                curation_scores.iter().filter(|score| score.selection_label == "reject").count(),
+            ),
             now.as_str(),
         ],
     )?;
 
     transaction.commit()?;
+    Ok(())
+}
+
+fn persist_group_records(
+    transaction: &Transaction<'_>,
+    analysis_run_id: &str,
+    groups: &[PhotoGroupingRecord],
+    grouping_type: &str,
+    now: &str,
+) -> anyhow::Result<()> {
+    let mut group_statement = transaction.prepare(
+        "INSERT INTO duplicate_groups (id, analysis_run_id, grouping_type, created_at) VALUES (?1, ?2, ?3, ?4)",
+    )?;
+    let mut member_statement = transaction.prepare(
+        "INSERT INTO duplicate_group_members (group_id, photo_id, similarity_score, rank_order) VALUES (?1, ?2, ?3, ?4)",
+    )?;
+
+    for (index, group) in groups.iter().enumerate() {
+        let group_id = format!("{}:{}:{}", grouping_type, analysis_run_id, index);
+        group_statement.execute(params![group_id.as_str(), analysis_run_id, grouping_type, now])?;
+        for member in &group.members {
+            member_statement.execute(params![
+                group_id.as_str(),
+                member.photo_id.as_str(),
+                member.similarity_score,
+                member.rank_order,
+            ])?;
+        }
+        let _ = &group.grouping_type;
+    }
+
     Ok(())
 }
 

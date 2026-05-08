@@ -1,6 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use image::GenericImageView;
 
 use crate::{
@@ -18,11 +19,47 @@ pub struct PhotoQualityMetricsRecord {
     pub overall_score: f64,
 }
 
+#[derive(Debug, Clone)]
+pub struct PhotoGroupingMemberRecord {
+    pub photo_id: String,
+    pub similarity_score: f64,
+    pub rank_order: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhotoGroupingRecord {
+    pub grouping_type: String,
+    pub members: Vec<PhotoGroupingMemberRecord>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhotoCurationScoreRecord {
+    pub photo_id: String,
+    pub ranking_score: f64,
+    pub selection_label: String,
+    pub selection_reason: String,
+    pub duplicate_penalty: f64,
+    pub burst_penalty: f64,
+}
+
 #[derive(Debug, Default)]
 pub struct QualityAnalysisResult {
     pub metrics: Vec<PhotoQualityMetricsRecord>,
+    pub duplicate_groups: Vec<PhotoGroupingRecord>,
+    pub burst_groups: Vec<PhotoGroupingRecord>,
+    pub curation_scores: Vec<PhotoCurationScoreRecord>,
     pub failed_photo_ids: Vec<String>,
     pub cancelled: bool,
+}
+
+#[derive(Debug, Clone)]
+struct PhotoAnalysisArtifact {
+    photo_id: String,
+    metrics: PhotoQualityMetricsRecord,
+    perceptual_hash: u64,
+    modified_at: Option<String>,
+    filename: String,
+    file_size_bytes: u64,
 }
 
 pub fn analyze_project_photos<F>(
@@ -34,15 +71,19 @@ where
     F: FnMut(u64, u64, f64),
 {
     let mut result = QualityAnalysisResult::default();
+    let mut artifacts = Vec::new();
 
     for (index, photo) in photos.iter().enumerate() {
         if !control.wait_for_run_permission() {
             result.cancelled = true;
-            return result;
+            return finalize_result(result, artifacts);
         }
 
-        match analyze_photo(Path::new(&photo.absolute_path), &photo.photo_id) {
-            Ok(metric) => result.metrics.push(metric),
+        match analyze_photo(photo) {
+            Ok(artifact) => {
+                result.metrics.push(artifact.metrics.clone());
+                artifacts.push(artifact);
+            }
             Err(_) => result.failed_photo_ids.push(photo.photo_id.clone()),
         }
 
@@ -54,11 +95,18 @@ where
         on_progress((index + 1) as u64, result.failed_photo_ids.len() as u64, average_score);
     }
 
+    finalize_result(result, artifacts)
+}
+
+fn finalize_result(mut result: QualityAnalysisResult, artifacts: Vec<PhotoAnalysisArtifact>) -> QualityAnalysisResult {
+    result.duplicate_groups = build_duplicate_groups(&artifacts);
+    result.burst_groups = build_burst_groups(&artifacts);
+    result.curation_scores = build_curation_scores(&artifacts, &result.duplicate_groups, &result.burst_groups);
     result
 }
 
-fn analyze_photo(path: &Path, photo_id: &str) -> Result<PhotoQualityMetricsRecord> {
-    let image = image::open(path)?;
+fn analyze_photo(photo: &AnalysisPhotoRecord) -> Result<PhotoAnalysisArtifact> {
+    let image = image::open(Path::new(&photo.absolute_path))?;
     let grayscale = image.to_luma8();
     let (width, height) = image.dimensions();
 
@@ -70,14 +118,320 @@ fn analyze_photo(path: &Path, photo_id: &str) -> Result<PhotoQualityMetricsRecor
         sharpness_score * 0.34 + exposure_score * 0.22 + contrast_score * 0.22 + resolution_score * 0.22,
     );
 
-    Ok(PhotoQualityMetricsRecord {
-        photo_id: photo_id.to_string(),
+    let metrics = PhotoQualityMetricsRecord {
+        photo_id: photo.photo_id.clone(),
         sharpness_score,
         exposure_score,
         contrast_score,
         resolution_score,
         overall_score,
+    };
+
+    Ok(PhotoAnalysisArtifact {
+        photo_id: photo.photo_id.clone(),
+        metrics,
+        perceptual_hash: difference_hash(&grayscale),
+        modified_at: photo.modified_at.clone(),
+        filename: photo.filename.clone(),
+        file_size_bytes: photo.file_size_bytes,
     })
+}
+
+fn build_duplicate_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroupingRecord> {
+    let mut groups = Vec::new();
+    let mut assigned = vec![false; artifacts.len()];
+
+    for i in 0..artifacts.len() {
+        if assigned[i] {
+            continue;
+        }
+
+        let mut members = vec![i];
+        for j in (i + 1)..artifacts.len() {
+            if assigned[j] {
+                continue;
+            }
+
+            let distance = hamming_distance(artifacts[i].perceptual_hash, artifacts[j].perceptual_hash);
+            let size_ratio = size_ratio(artifacts[i].file_size_bytes, artifacts[j].file_size_bytes);
+            if distance <= 6 && size_ratio >= 0.92 {
+                members.push(j);
+            }
+        }
+
+        if members.len() < 2 {
+            continue;
+        }
+
+        for &index in &members {
+            assigned[index] = true;
+        }
+
+        members.sort_by(|left, right| {
+            artifacts[*right]
+                .metrics
+                .overall_score
+                .partial_cmp(&artifacts[*left].metrics.overall_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let exemplar_hash = artifacts[members[0]].perceptual_hash;
+        let group_members = members
+            .iter()
+            .enumerate()
+            .map(|(rank, index)| PhotoGroupingMemberRecord {
+                photo_id: artifacts[*index].photo_id.clone(),
+                similarity_score: 1.0 - hamming_distance(exemplar_hash, artifacts[*index].perceptual_hash) as f64 / 64.0,
+                rank_order: rank as i64,
+            })
+            .collect();
+
+        groups.push(PhotoGroupingRecord {
+            grouping_type: "duplicate".into(),
+            members: group_members,
+        });
+    }
+
+    groups
+}
+
+fn build_burst_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroupingRecord> {
+    let mut sortable: Vec<(i64, usize)> = artifacts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, artifact)| {
+            let timestamp = artifact
+                .modified_at
+                .as_deref()
+                .and_then(parse_timestamp_seconds)?;
+            Some((timestamp, index))
+        })
+        .collect();
+    sortable.sort_by_key(|(timestamp, _)| *timestamp);
+
+    let mut groups = Vec::new();
+    let mut current: Vec<usize> = Vec::new();
+
+    for (_, index) in sortable {
+        if current.is_empty() {
+            current.push(index);
+            continue;
+        }
+
+        let previous_index = *current.last().unwrap_or(&index);
+        if is_burst_neighbor(&artifacts[previous_index], &artifacts[index]) {
+            current.push(index);
+        } else {
+            if current.len() >= 2 {
+                groups.push(build_burst_group(&current, artifacts));
+            }
+            current = vec![index];
+        }
+    }
+
+    if current.len() >= 2 {
+        groups.push(build_burst_group(&current, artifacts));
+    }
+
+    groups
+}
+
+fn build_burst_group(indices: &[usize], artifacts: &[PhotoAnalysisArtifact]) -> PhotoGroupingRecord {
+    let mut sorted = indices.to_vec();
+    sorted.sort_by(|left, right| {
+        artifacts[*right]
+            .metrics
+            .overall_score
+            .partial_cmp(&artifacts[*left].metrics.overall_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let anchor_hash = artifacts[sorted[0]].perceptual_hash;
+    let members = sorted
+        .iter()
+        .enumerate()
+        .map(|(rank, index)| PhotoGroupingMemberRecord {
+            photo_id: artifacts[*index].photo_id.clone(),
+            similarity_score: 1.0 - hamming_distance(anchor_hash, artifacts[*index].perceptual_hash) as f64 / 64.0,
+            rank_order: rank as i64,
+        })
+        .collect();
+
+    PhotoGroupingRecord {
+        grouping_type: "burst".into(),
+        members,
+    }
+}
+
+fn is_burst_neighbor(left: &PhotoAnalysisArtifact, right: &PhotoAnalysisArtifact) -> bool {
+    let left_timestamp = left.modified_at.as_deref().and_then(parse_timestamp_seconds);
+    let right_timestamp = right.modified_at.as_deref().and_then(parse_timestamp_seconds);
+    let (Some(left_timestamp), Some(right_timestamp)) = (left_timestamp, right_timestamp) else {
+        return false;
+    };
+
+    let timestamp_gap = (right_timestamp - left_timestamp).abs();
+    if timestamp_gap > 3 {
+        return false;
+    }
+
+    let normalized_left = normalize_stem(&left.filename);
+    let normalized_right = normalize_stem(&right.filename);
+    let distance = hamming_distance(left.perceptual_hash, right.perceptual_hash);
+    normalized_left == normalized_right || distance <= 18
+}
+
+fn normalize_stem(filename: &str) -> String {
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let trimmed = stem.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '_' | '-' | ' '));
+    if trimmed.is_empty() {
+        stem
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn parse_timestamp_seconds(value: &str) -> Option<i64> {
+    DateTime::parse_from_rfc3339(value).ok().map(|datetime| datetime.with_timezone(&Utc).timestamp())
+}
+
+fn difference_hash(image: &image::GrayImage) -> u64 {
+    let resized = image::imageops::resize(image, 9, 8, image::imageops::FilterType::Triangle);
+    let mut hash = 0_u64;
+
+    for y in 0..8 {
+        for x in 0..8 {
+            let left = resized.get_pixel(x, y)[0];
+            let right = resized.get_pixel(x + 1, y)[0];
+            if left > right {
+                hash |= 1_u64 << (y * 8 + x);
+            }
+        }
+    }
+
+    hash
+}
+
+fn hamming_distance(left: u64, right: u64) -> u32 {
+    (left ^ right).count_ones()
+}
+
+fn size_ratio(left: u64, right: u64) -> f64 {
+    let min = left.min(right) as f64;
+    let max = left.max(right) as f64;
+    if max == 0.0 {
+        return 0.0;
+    }
+    min / max
+}
+
+fn build_curation_scores(
+    artifacts: &[PhotoAnalysisArtifact],
+    duplicate_groups: &[PhotoGroupingRecord],
+    burst_groups: &[PhotoGroupingRecord],
+) -> Vec<PhotoCurationScoreRecord> {
+    use std::collections::HashMap;
+
+    let mut duplicate_positions = HashMap::<String, usize>::new();
+    let mut burst_positions = HashMap::<String, usize>::new();
+
+    for group in duplicate_groups {
+        for member in &group.members {
+            duplicate_positions.insert(member.photo_id.clone(), member.rank_order.max(0) as usize);
+        }
+    }
+
+    for group in burst_groups {
+        for member in &group.members {
+            burst_positions.insert(member.photo_id.clone(), member.rank_order.max(0) as usize);
+        }
+    }
+
+    artifacts
+        .iter()
+        .map(|artifact| {
+            let duplicate_rank = duplicate_positions.get(&artifact.photo_id).copied();
+            let burst_rank = burst_positions.get(&artifact.photo_id).copied();
+            let duplicate_penalty = duplicate_penalty(duplicate_rank);
+            let burst_penalty = burst_penalty(burst_rank);
+            let ranking_score = clamp_score(artifact.metrics.overall_score - duplicate_penalty - burst_penalty);
+            let selection_label = selection_label(ranking_score);
+            let selection_reason = selection_reason(artifact.metrics.overall_score, duplicate_rank, burst_rank);
+
+            PhotoCurationScoreRecord {
+                photo_id: artifact.photo_id.clone(),
+                ranking_score,
+                selection_label: selection_label.to_string(),
+                selection_reason,
+                duplicate_penalty,
+                burst_penalty,
+            }
+        })
+        .collect()
+}
+
+fn duplicate_penalty(rank: Option<usize>) -> f64 {
+    match rank {
+        None | Some(0) => 0.0,
+        Some(1) => 0.14,
+        Some(rank) => (0.2 + ((rank.saturating_sub(2)) as f64 * 0.05)).min(0.38),
+    }
+}
+
+fn burst_penalty(rank: Option<usize>) -> f64 {
+    match rank {
+        None | Some(0) => 0.0,
+        Some(1) => 0.05,
+        Some(rank) => (0.1 + ((rank.saturating_sub(2)) as f64 * 0.03)).min(0.22),
+    }
+}
+
+fn selection_label(score: f64) -> &'static str {
+    if score >= 0.78 {
+        "keep"
+    } else if score >= 0.56 {
+        "review"
+    } else {
+        "reject"
+    }
+}
+
+fn selection_reason(overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> String {
+    let quality_note = if overall_score >= 0.82 {
+        "strong technical quality"
+    } else if overall_score >= 0.68 {
+        "usable technical quality"
+    } else {
+        "weak technical quality"
+    };
+
+    let duplicate_note = match duplicate_rank {
+        Some(0) => Some("best duplicate frame"),
+        Some(_) => Some("lower-ranked duplicate frame"),
+        None => None,
+    };
+
+    let burst_note = match burst_rank {
+        Some(0) => Some("best burst candidate"),
+        Some(_) => Some("secondary burst frame"),
+        None => None,
+    };
+
+    let mut notes = vec![quality_note.to_string()];
+    if let Some(note) = duplicate_note {
+        notes.push(note.to_string());
+    }
+    if let Some(note) = burst_note {
+        notes.push(note.to_string());
+    }
+    if duplicate_note.is_none() && burst_note.is_none() {
+        notes.push("standalone frame".to_string());
+    }
+
+    notes.join("; ")
 }
 
 fn score_sharpness(image: &image::GrayImage) -> f64 {
