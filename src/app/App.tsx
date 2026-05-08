@@ -6,6 +6,7 @@ import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
+import { getQualityAnalysisTask, startQualityAnalysis } from "../services/analysisService";
 import { listProjectPhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
@@ -14,11 +15,11 @@ import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
 import type { CreateProjectInput, ProjectPhoto } from "../types/project";
-import type { ScanTask, SystemStatus } from "../types/system";
+import type { QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
 
-function isTerminal(task?: ScanTask) {
+function isTerminal(task?: ScanTask | QualityAnalysisTask) {
   return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
 }
 
@@ -48,8 +49,10 @@ export function App() {
   const openProject = useProjectStore((state) => state.openProject);
 
   const activeTask = useScanStore((state) => state.activeTask);
+  const activeAnalysisTask = useScanStore((state) => state.activeAnalysisTask);
   const activity = useScanStore((state) => state.activity);
   const setActiveTask = useScanStore((state) => state.setActiveTask);
+  const setActiveAnalysisTask = useScanStore((state) => state.setActiveAnalysisTask);
   const addActivity = useScanStore((state) => state.addActivity);
 
   useEffect(() => {
@@ -187,6 +190,60 @@ export function App() {
     };
   }, [activeTask, addActivity, openProject, setActiveTask, setProjects]);
 
+  useEffect(() => {
+    if (!activeAnalysisTask || isTerminal(activeAnalysisTask)) {
+      return;
+    }
+
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const nextTask = await getQualityAnalysisTask(activeAnalysisTask.id);
+        if (!nextTask || cancelled) {
+          return;
+        }
+
+        setActiveAnalysisTask(nextTask);
+
+        if (isTerminal(nextTask)) {
+          const refreshedPhotos = await listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+          if (cancelled) {
+            return;
+          }
+          setProjectPhotos(refreshedPhotos);
+          setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
+          addActivity({
+            id: crypto.randomUUID(),
+            eventType: nextTask.status === "error" ? "quality_analysis_failed" : "quality_analysis_completed",
+            severity: nextTask.status === "error" ? "error" : nextTask.failedCount > 0 ? "warning" : "info",
+            message: nextTask.message,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        setActiveAnalysisTask({
+          id: activeAnalysisTask.id,
+          projectId: activeAnalysisTask.projectId,
+          status: "error",
+          progressCurrent: activeAnalysisTask.progressCurrent,
+          progressTotal: activeAnalysisTask.progressTotal,
+          message: error instanceof Error ? error.message : "Failed to poll quality analysis task.",
+          analyzedCount: activeAnalysisTask.analyzedCount,
+          failedCount: activeAnalysisTask.failedCount,
+          averageScore: activeAnalysisTask.averageScore,
+        });
+      }
+    }, 900);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeAnalysisTask, addActivity, setActiveAnalysisTask]);
+
   async function refreshSystemStatus() {
     setIsRefreshingSystemStatus(true);
     try {
@@ -267,6 +324,56 @@ export function App() {
         eventType: "scan_failed",
         severity: "error",
         message: error instanceof Error ? error.message : "Scan failed.",
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async function handleStartAnalysis() {
+    if (!currentProject) {
+      return;
+    }
+
+    try {
+      const task = await startQualityAnalysis(currentProject.projectId);
+      setActiveAnalysisTask(task);
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "quality_analysis_started",
+        severity: "info",
+        message: `Started technical quality analysis for ${currentProject.name}.`,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (isTerminal(task)) {
+        const refreshedPhotos = await listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE });
+        setProjectPhotos(refreshedPhotos);
+        setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
+        addActivity({
+          id: crypto.randomUUID(),
+          eventType: task.status === "error" ? "quality_analysis_failed" : "quality_analysis_completed",
+          severity: task.status === "error" ? "error" : task.failedCount > 0 ? "warning" : "info",
+          message: task.message,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      setActiveAnalysisTask({
+        id: crypto.randomUUID(),
+        projectId: currentProject.projectId,
+        status: "error",
+        progressCurrent: 0,
+        progressTotal: 0,
+        message: error instanceof Error ? error.message : "Technical quality analysis failed.",
+        analyzedCount: 0,
+        failedCount: 0,
+        averageScore: 0,
+      });
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "quality_analysis_failed",
+        severity: "error",
+        message: error instanceof Error ? error.message : "Technical quality analysis failed.",
         createdAt: new Date().toISOString(),
       });
     }
@@ -356,7 +463,7 @@ export function App() {
       <div>
         <p className="text-sm uppercase tracking-[0.36em] text-accent/80">Lumoza</p>
         <h1 className="mt-3 text-3xl font-semibold text-text">Studio</h1>
-        <p className="mt-3 text-sm leading-7 text-muted">Offline-first AI curation starts with a reliable local foundation.</p>
+        <p className="mt-3 text-sm leading-7 text-muted">Offline-first AI curation now moves from foundation into fast technical analysis.</p>
       </div>
       <nav className="grid gap-2 text-sm text-muted">
         <button type="button" onClick={() => setCurrentView("dashboard")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Dashboard</button>
@@ -365,9 +472,9 @@ export function App() {
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Current total product progress: 100%
+        Full product progress: 31%
 
-Phase 1 complete. Native build validation now passes and the desktop foundation is ready for Phase 2 work.
+Phase 1 is complete. Phase 2 is in progress, with technical quality scoring active and duplicates, bursts, ranking, face intelligence, polish, and release work still ahead.
       </div>
     </div>
   );
@@ -375,8 +482,8 @@ Phase 1 complete. Native build validation now passes and the desktop foundation 
   const topbar = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 1 foundation</p>
-        <h2 className="mt-2 text-3xl font-semibold text-text">Stable local-first desktop architecture</h2>
+        <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 fast AI engine</p>
+        <h2 className="mt-2 text-3xl font-semibold text-text">Technical quality analysis and scoring</h2>
       </div>
       <CreateProject onCreate={handleCreateProject} />
     </div>
@@ -394,9 +501,11 @@ Phase 1 complete. Native build validation now passes and the desktop foundation 
         hasMorePhotos={hasMorePhotos}
         photoError={photoError}
         task={activeTask}
+        analysisTask={activeAnalysisTask}
         activity={activity}
         onLoadMorePhotos={handleLoadMorePhotos}
         onStartScan={handleStartScan}
+        onStartAnalysis={handleStartAnalysis}
         onPause={handlePauseScan}
         onResume={handleResumeScan}
         onCancel={handleCancelScan}
@@ -408,6 +517,7 @@ Phase 1 complete. Native build validation now passes and the desktop foundation 
         currentProject={currentProject}
         activity={activity}
         task={activeTask}
+        analysisTask={activeAnalysisTask}
         systemStatus={systemStatus}
         systemError={systemError}
         isRefreshingSystemStatus={isRefreshingSystemStatus}

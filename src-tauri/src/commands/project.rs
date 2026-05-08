@@ -41,6 +41,11 @@ pub struct ProjectPhotoResponse {
     pub modified_at: Option<String>,
     pub thumbnail_status: String,
     pub thumbnail_cache_path: Option<String>,
+    pub sharpness_score: Option<f64>,
+    pub exposure_score: Option<f64>,
+    pub contrast_score: Option<f64>,
+    pub resolution_score: Option<f64>,
+    pub overall_score: Option<f64>,
 }
 
 #[tauri::command]
@@ -114,6 +119,11 @@ pub fn list_project_photos(
             modified_at: photo.modified_at,
             thumbnail_status: photo.thumbnail_status,
             thumbnail_cache_path: photo.thumbnail_cache_path,
+            sharpness_score: photo.sharpness_score,
+            exposure_score: photo.exposure_score,
+            contrast_score: photo.contrast_score,
+            resolution_score: photo.resolution_score,
+            overall_score: photo.overall_score,
         })
         .collect())
 }

@@ -168,7 +168,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
         </div>
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted">
           <span className="rounded-full bg-white/6 px-3 py-1">{photos.length}{hasMore ? "+" : ""} loaded</span>
-          <span className="rounded-full bg-white/6 px-3 py-1">Virtualized browser</span>
+          <span className="rounded-full bg-white/6 px-3 py-1">Phase 2 scores</span>
         </div>
       </div>
 
@@ -186,8 +186,8 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
               <span className="mt-2 block text-text">App-managed cache previews when available</span>
             </div>
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Scroll state</span>
-              <span className="mt-2 block text-text">{isLoadingMore ? "Loading more indexed media..." : hasMore ? "More records will load near the bottom" : "All loaded records are currently in memory"}</span>
+              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Analysis state</span>
+              <span className="mt-2 block text-text">Technical quality scores surface as soon as analysis results exist</span>
             </div>
           </div>
 
@@ -195,10 +195,16 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
             <div style={{ height: totalHeight > 0 ? `${totalHeight}px` : `${CARD_HEIGHT}px`, position: "relative" }}>
               {virtualItems.map(({ photo, style }) => {
                 const previewSrc = resolvePreviewSrc(photo);
+                const overallScore = photo.quality?.overallScore;
 
                 return (
                   <article key={photo.id} style={{ ...style, height: `${CARD_HEIGHT}px` }} className="flex flex-col overflow-hidden rounded-[20px] border border-white/8 bg-panel/80 shadow-soft">
-                    <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent" style={{ height: `${PREVIEW_HEIGHT}px` }}>
+                    <div className="relative bg-gradient-to-br from-white/10 via-white/5 to-transparent" style={{ height: `${PREVIEW_HEIGHT}px` }}>
+                      {overallScore !== undefined ? (
+                        <span className="absolute left-3 top-3 rounded-full bg-ink/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                          {(overallScore * 100).toFixed(0)} quality
+                        </span>
+                      ) : null}
                       {previewSrc ? (
                         <img
                           src={previewSrc}

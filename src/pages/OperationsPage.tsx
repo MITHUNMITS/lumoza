@@ -1,11 +1,12 @@
-import { Activity, AlertTriangle, RefreshCcw, Server, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, BrainCircuit, RefreshCcw, Server, ShieldCheck } from "lucide-react";
 import type { ProjectSummary } from "../types/project";
-import type { ActivityItem, ScanTask, SystemStatus } from "../types/system";
+import type { ActivityItem, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 interface OperationsPageProps {
   currentProject?: ProjectSummary;
   activity: ActivityItem[];
   task?: ScanTask;
+  analysisTask?: QualityAnalysisTask;
   systemStatus?: SystemStatus;
   systemError?: string;
   isRefreshingSystemStatus: boolean;
@@ -39,7 +40,7 @@ function systemSummary(status?: SystemStatus) {
     return "Desktop foundation is healthy, but the Python sidecar is offline.";
   }
   if (status.pythonSidecar === "placeholder") {
-    return "Desktop foundation is healthy. Python sidecar remains a planned placeholder in Phase 1.";
+    return "Desktop foundation is healthy. Python sidecar remains a lightweight capability placeholder while Phase 2 analysis runs locally.";
   }
   return "Desktop foundation is healthy and all monitored services currently report ready.";
 }
@@ -52,6 +53,7 @@ export function OperationsPage({
   currentProject,
   activity,
   task,
+  analysisTask,
   systemStatus,
   systemError,
   isRefreshingSystemStatus,
@@ -79,7 +81,7 @@ export function OperationsPage({
               <p className="text-sm uppercase tracking-[0.22em]">Incidents</p>
             </div>
             <p className="mt-4 text-3xl font-semibold text-text">{incidents.length}</p>
-            <p className="mt-2 text-sm text-muted">Warnings and errors surfaced by project creation, scanning, or thumbnail work.</p>
+            <p className="mt-2 text-sm text-muted">Warnings and errors surfaced by scanning, thumbnails, or Phase 2 analysis.</p>
           </div>
           <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
             <div className={`flex items-center gap-3 ${statusTone(systemStatus)}`}>
@@ -142,7 +144,7 @@ export function OperationsPage({
           <div className="mt-5 space-y-4">
             {incidents.length === 0 ? (
               <div className="rounded-[20px] border border-accent/20 bg-accent/10 p-5 text-sm text-muted">
-                No warnings or errors are currently recorded in the session. That is the correct Phase 1 steady state.
+                No warnings or errors are currently recorded in the session.
               </div>
             ) : (
               incidents.map((item) => (
@@ -178,9 +180,7 @@ export function OperationsPage({
               Refresh
             </button>
           </div>
-          {systemError ? (
-            <div className="mt-5 rounded-[20px] border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{systemError}</div>
-          ) : null}
+          {systemError ? <div className="mt-5 rounded-[20px] border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{systemError}</div> : null}
           <div className="mt-5 grid gap-3 text-sm text-muted">
             <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/30 px-4 py-3">
               <span>Python sidecar</span>
@@ -202,29 +202,34 @@ export function OperationsPage({
         </div>
 
         <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Active task snapshot</p>
-          {task ? (
+          <div className="flex items-center gap-3 text-accent">
+            <BrainCircuit className="h-5 w-5" />
+            <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 analysis</p>
+          </div>
+          {analysisTask ? (
             <div className="mt-4 space-y-3 text-sm text-muted">
               <div className="flex items-center justify-between">
                 <span>Status</span>
-                <span className="text-text">{task.status}</span>
+                <span className="text-text">{analysisTask.status}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Progress</span>
-                <span className="text-text">{task.progressCurrent} / {task.progressTotal}</span>
+                <span className="text-text">{analysisTask.progressCurrent} / {analysisTask.progressTotal}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Indexed</span>
-                <span className="text-text">{task.indexedCount}</span>
+                <span>Analyzed</span>
+                <span className="text-text">{analysisTask.analyzedCount}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Failed</span>
-                <span className="text-text">{task.failedCount + task.thumbnailFailedCount}</span>
+                <span>Average score</span>
+                <span className="text-text">{(analysisTask.averageScore * 100).toFixed(0)}%</span>
               </div>
-              <p className="rounded-[18px] border border-white/8 bg-ink/30 p-4 leading-7 text-text">{task.message}</p>
+              <p className="rounded-[18px] border border-white/8 bg-ink/30 p-4 leading-7 text-text">{analysisTask.message}</p>
             </div>
+          ) : task ? (
+            <p className="mt-4 text-sm leading-7 text-muted">Scan activity is present, but technical quality analysis has not run for this session yet.</p>
           ) : (
-            <p className="mt-4 text-sm leading-7 text-muted">No active task is currently registered. The browser and registry are idle.</p>
+            <p className="mt-4 text-sm leading-7 text-muted">No active analysis task is currently registered.</p>
           )}
         </div>
       </section>

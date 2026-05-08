@@ -2,7 +2,7 @@ import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { getThumbnailPipelineSummary } from "../services/thumbnailService";
 import type { ProjectPhoto, ProjectSummary } from "../types/project";
-import type { ActivityItem, ScanTask } from "../types/system";
+import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
 
 interface ProjectWorkspaceProps {
   project: ProjectSummary;
@@ -12,12 +12,23 @@ interface ProjectWorkspaceProps {
   hasMorePhotos: boolean;
   photoError?: string;
   task?: ScanTask;
+  analysisTask?: QualityAnalysisTask;
   activity: ActivityItem[];
   onLoadMorePhotos: () => void;
   onStartScan: () => void;
+  onStartAnalysis: () => void;
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
+}
+
+function averageQualityScore(photos: ProjectPhoto[]) {
+  const scored = photos.filter((photo) => photo.quality?.overallScore !== undefined);
+  if (scored.length === 0) {
+    return undefined;
+  }
+  const total = scored.reduce((sum, photo) => sum + (photo.quality?.overallScore ?? 0), 0);
+  return total / scored.length;
 }
 
 export function ProjectWorkspace({
@@ -28,14 +39,17 @@ export function ProjectWorkspace({
   hasMorePhotos,
   photoError,
   task,
+  analysisTask,
   activity,
   onLoadMorePhotos,
   onStartScan,
+  onStartAnalysis,
   onPause,
   onResume,
   onCancel,
 }: ProjectWorkspaceProps) {
   const thumbnailSummary = getThumbnailPipelineSummary(task);
+  const averageScore = averageQualityScore(photos);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
@@ -47,7 +61,10 @@ export function ProjectWorkspace({
               <h2 className="mt-2 text-3xl font-semibold text-text">{project.name}</h2>
               <p className="mt-3 text-sm text-muted">{project.rootFolder}</p>
             </div>
-            <button type="button" onClick={onStartScan} className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white">Start scan</button>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={onStartAnalysis} className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-text">Run analysis</button>
+              <button type="button" onClick={onStartScan} className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white">Start scan</button>
+            </div>
           </div>
         </div>
         <ProjectPhotoGrid
@@ -62,6 +79,26 @@ export function ProjectWorkspace({
 
       <section className="grid gap-5">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">Technical quality</p>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            {analysisTask ? analysisTask.message : averageScore !== undefined ? `Latest average technical score ${(averageScore * 100).toFixed(0)}%.` : "Run Phase 2 analysis to compute technical quality metrics for this project."}
+          </p>
+          <div className="mt-4 grid gap-2 text-sm text-muted">
+            <div className="flex items-center justify-between">
+              <span>Analyzed photos</span>
+              <span className="text-text">{analysisTask?.analyzedCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Average score</span>
+              <span className="text-text">{((analysisTask?.averageScore ?? averageScore ?? 0) * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Analysis failures</span>
+              <span className="text-text">{analysisTask?.failedCount ?? 0}</span>
+            </div>
+          </div>
+        </div>
         <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
           <p className="text-sm uppercase tracking-[0.22em] text-muted">{thumbnailSummary.title}</p>
           <p className="mt-3 text-sm leading-7 text-muted">{thumbnailSummary.detail}</p>

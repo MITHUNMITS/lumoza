@@ -20,6 +20,18 @@ export interface ScanTask {
   thumbnailFailedCount: number;
 }
 
+export interface QualityAnalysisTask {
+  id: string;
+  projectId: string;
+  status: ScanTaskStatus;
+  progressCurrent: number;
+  progressTotal: number;
+  message: string;
+  analyzedCount: number;
+  failedCount: number;
+  averageScore: number;
+}
+
 export interface ActivityItem {
   id: string;
   eventType: string;

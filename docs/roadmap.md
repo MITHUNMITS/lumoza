@@ -2,9 +2,9 @@
 
 ## Current Stage
 
-Lumoza has completed Phase 1 foundation and is ready for Phase 2 planning.
+Lumoza has completed Phase 1 foundation and is now in Phase 2 implementation.
 
-Current total product progress: 100%
+Current full product progress: 31%
 
 ## Phases
 
@@ -53,3 +53,16 @@ Goal:
 ## Phase Discipline
 
 Every phase should be completed and reviewed before the next phase begins.
+
+
+## Completion Model
+
+This percentage is full-program progress, not phase-local progress.
+
+Current weighted estimate: `31%` overall.
+
+Interpretation:
+- Phase 1: 100% complete
+- Phase 2: early implementation in progress
+- Phases 3-6: largely unstarted
+- Launch-critical cross-cutting work: mostly still open

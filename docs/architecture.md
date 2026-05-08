@@ -513,3 +513,8 @@ These are still unresolved and should be fixed before heavy implementation:
 - Registry storage location for app-level project index
 - Licensing and activation strategy for premium desktop distribution
 - Whether first packaging target is macOS, Windows, or both
+
+
+## Phase 2 Extension Note
+
+The first Phase 2 slice adds a persisted technical-quality pipeline on top of the Phase 1 photo index. This slice introduces `analysis_runs`, `photo_quality_metrics`, and duplicate-group scaffold tables, plus a background native analysis task that computes sharpness, exposure, contrast, resolution, and overall quality scores for indexed photos.

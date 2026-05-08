@@ -4,7 +4,9 @@
 
 Deliver a stable, premium-feeling desktop foundation for local project creation, photo ingestion, scanning, indexing, thumbnails, and progress tracking.
 
-Current total product progress: 100%
+Phase 1 progress: 100% complete
+
+Full product progress: 31% overall
 
 ## Phase 1 Deliverables
 

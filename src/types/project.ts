@@ -12,6 +12,14 @@ export interface ProjectSummary {
   lastOpenedAt?: string;
 }
 
+export interface ProjectPhotoQualitySummary {
+  sharpnessScore?: number;
+  exposureScore?: number;
+  contrastScore?: number;
+  resolutionScore?: number;
+  overallScore?: number;
+}
+
 export interface ProjectPhoto {
   id: string;
   absolutePath: string;
@@ -23,6 +31,7 @@ export interface ProjectPhoto {
   modifiedAt?: string;
   thumbnailStatus: ThumbnailStatus;
   thumbnailCachePath?: string;
+  quality?: ProjectPhotoQualitySummary;
 }
 
 export interface CreateProjectInput {
