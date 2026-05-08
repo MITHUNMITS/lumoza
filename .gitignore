@@ -18,6 +18,7 @@ dist/
 build/
 .next/
 coverage/
+.npm-cache/
 
 # Python
 __pycache__/

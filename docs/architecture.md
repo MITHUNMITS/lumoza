@@ -64,6 +64,7 @@ Reasoning:
 - SQLite
 - One database per project
 - Project registry stored in app-level config storage
+- All writable project artifacts are stored under the application data directory, never inside the original photo source folders
 
 ### Python Sidecar
 
