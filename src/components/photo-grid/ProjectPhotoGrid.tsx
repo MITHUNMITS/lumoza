@@ -141,19 +141,15 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
   }
 
   return (
-    <section className="lumoza-card rounded-[30px] p-5">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 text-accent">
-            <Grid3X3 className="h-5 w-5" />
-            <p className="text-xs font-semibold uppercase tracking-[0.24em]">Media grid</p>
-          </div>
-          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">Indexed project media</h3>
+    <section className="rounded-[30px] bg-ink/24 p-3 shadow-soft">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-2">
+        <div className="flex items-center gap-2 text-muted">
+          <Grid3X3 className="h-4 w-4 text-accent" />
+          <span className="text-sm font-medium">Photos</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill tone="muted">{photos.length}{hasMore ? "+" : ""} loaded</StatusPill>
-          <StatusPill tone="accent">Virtualized</StatusPill>
-          <StatusPill tone="purple">AI badges</StatusPill>
+          <StatusPill tone="muted">{photos.length}{hasMore ? "+" : ""}</StatusPill>
+          <StatusPill tone="accent">AI</StatusPill>
         </div>
       </div>
 
@@ -162,23 +158,8 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
       {!isLoading && !error && photos.length === 0 ? <EmptyState eyebrow="No media" title="No indexed photos yet" detail="Run a scan to populate this workspace with safe cached previews and metadata." /> : null}
 
       {!isLoading && !error && photos.length > 0 ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 rounded-[24px] border border-white/8 bg-ink/30 p-4 text-sm text-muted md:grid-cols-3">
-            <div>
-              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">Viewport</span>
-              <span className="mt-2 block text-text">Windowed rendering for large projects</span>
-            </div>
-            <div>
-              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">AI layer</span>
-              <span className="mt-2 block text-text">Quality, ranking, duplicate, burst, and future people badges</span>
-            </div>
-            <div>
-              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">Loading</span>
-              <span className="mt-2 block text-text">{isLoadingMore ? "Loading more media..." : hasMore ? "More loads near the bottom" : "All loaded records visible"}</span>
-            </div>
-          </div>
-
-          <div ref={viewportRef} className="lumoza-scrollbar relative h-[calc(100vh-300px)] min-h-[620px] overflow-y-auto rounded-[26px] border border-white/8 bg-ink/35 p-3">
+        <div className="space-y-3">
+          <div ref={viewportRef} className="lumoza-scrollbar relative h-[calc(100vh-260px)] min-h-[660px] overflow-y-auto rounded-[26px] bg-ink/30 p-3">
             <div style={{ height: totalHeight > 0 ? `${totalHeight}px` : `${CARD_HEIGHT}px`, position: "relative" }}>
               {virtualItems.map(({ photo, style }) => (
                 <ThumbnailCard key={photo.id} photo={photo} previewSrc={resolvePreviewSrc(photo)} style={style} height={CARD_HEIGHT} previewHeight={PREVIEW_HEIGHT} />

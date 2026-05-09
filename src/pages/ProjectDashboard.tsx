@@ -1,8 +1,8 @@
-import { HardDrive, Images, LockKeyhole, Sparkles } from "lucide-react";
+import { Clock3, Images, Plus } from "lucide-react";
 import { ProjectCard } from "../components/project/ProjectCard";
 import { CreateProject } from "./CreateProject";
 import { EmptyState } from "../components/ui/EmptyState";
-import { MetricCard } from "../components/ui/MetricCard";
+import { LumozaButton } from "../components/ui/LumozaButton";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { CreateProjectInput, ProjectSummary } from "../types/project";
 
@@ -13,69 +13,66 @@ interface ProjectDashboardProps {
 }
 
 export function ProjectDashboard({ projects, onOpenProject, onCreateProject }: ProjectDashboardProps) {
-  const indexedCount = projects.reduce((total, project) => total + project.photoCount, 0);
+  const latestProject = projects[0];
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-      <section className="grid gap-5">
-        <div className="lumoza-panel relative overflow-hidden rounded-[34px] p-7">
-          <div className="absolute right-8 top-0 h-56 w-72 rounded-full bg-accent/10 blur-3xl" />
-          <div className="relative flex flex-wrap items-end justify-between gap-5">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusPill tone="accent">Creative library</StatusPill>
-                <StatusPill tone="success">Read-only originals</StatusPill>
-              </div>
-              <h2 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.055em] text-text lg:text-5xl">Curate huge photo stories without losing the quiet.</h2>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
-                Create a local project, scan safely, and let Lumoza build the intelligence layer around your media instead of turning it into a dashboard.
-              </p>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="min-w-0 space-y-4">
+        <div className="relative min-h-[360px] overflow-hidden rounded-[38px] bg-ink/38 shadow-panel">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent/18 via-purple/10 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink/88 to-transparent" />
+          <div className="absolute right-10 top-8 h-52 w-72 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative flex min-h-[360px] flex-col justify-end p-8 lg:p-10">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill tone="accent">Memory studio</StatusPill>
+              <StatusPill tone="success">Local</StatusPill>
+            </div>
+            <h1 className="mt-5 max-w-3xl text-5xl font-semibold tracking-[-0.07em] text-text lg:text-6xl">Your stories, quietly organized.</h1>
+            <div className="mt-7 flex flex-wrap gap-3">
+              {latestProject ? (
+                <LumozaButton type="button" variant="primary" onClick={() => onOpenProject(latestProject.projectId)}>Continue</LumozaButton>
+              ) : null}
+              <LumozaButton type="button" variant="secondary">Import photos</LumozaButton>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard icon={<Images className="h-5 w-5" />} label="Projects" value={projects.length} detail="Local workspaces" tone="accent" />
-          <MetricCard icon={<HardDrive className="h-5 w-5" />} label="Indexed" value={indexedCount} detail="Photos in project databases" tone="purple" />
-          <MetricCard icon={<LockKeyhole className="h-5 w-5" />} label="Safety" value="Read-only" detail="Original files are never modified" tone="success" />
-        </div>
-
-        <section className="lumoza-card rounded-[30px] p-5">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Recent workspaces</p>
-              <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">Projects</h3>
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-4 px-1">
+            <div className="flex items-center gap-2 text-muted">
+              <Images className="h-4 w-4 text-accent" />
+              <span className="text-sm font-medium">Recent projects</span>
             </div>
-            <StatusPill tone="muted">{projects.length} total</StatusPill>
+            <span className="text-sm text-subtle">{projects.length}</span>
           </div>
-          <div className="grid gap-4">
-            {projects.length === 0 ? (
-              <EmptyState title="No projects yet" detail="Start with a local folder. Lumoza will build project metadata, thumbnails, and intelligence caches without touching originals." />
-            ) : (
-              projects.map((project) => <ProjectCard key={project.projectId} project={project} onOpen={onOpenProject} />)
-            )}
-          </div>
-        </section>
+          {projects.length === 0 ? (
+            <EmptyState title="Create your first memory workspace" detail="Choose a folder and Lumoza will build a local project around it." />
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2 3xl:grid-cols-3">
+              {projects.map((project) => <ProjectCard key={project.projectId} project={project} onOpen={onOpenProject} />)}
+            </div>
+          )}
+        </div>
       </section>
 
-      <section className="grid content-start gap-5">
+      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
         {onCreateProject ? <CreateProject onCreate={onCreateProject} /> : null}
-        <div className="lumoza-card rounded-[30px] p-6">
-          <div className="flex items-center gap-3 text-accent">
-            <Sparkles className="h-5 w-5" />
-            <p className="text-xs font-semibold uppercase tracking-[0.24em]">Product direction</p>
+        <div className="rounded-[30px] bg-white/[0.035] p-5 shadow-soft">
+          <div className="mb-4 flex items-center justify-between text-sm text-muted">
+            <span>Quick actions</span>
+            <Plus className="h-4 w-4 text-accent" />
           </div>
-          <div className="mt-5 space-y-4 text-sm leading-7 text-muted">
-            <p>Phase 1 and 2 are complete. Phase 3 foundations are active, with people intelligence ready for real local detection and clustering.</p>
-            <p>The UI now reserves space for future people, reviews, final selection, model packs, and export workflows without implementing those phases early.</p>
+          <div className="grid gap-2">
+            <button className="lumoza-focus rounded-2xl bg-white/[0.055] px-4 py-3 text-left text-sm text-text transition hover:bg-white/[0.08]">New wedding project</button>
+            <button className="lumoza-focus rounded-2xl bg-white/[0.055] px-4 py-3 text-left text-sm text-text transition hover:bg-white/[0.08]">Resume scan</button>
+            <button className="lumoza-focus rounded-2xl bg-white/[0.055] px-4 py-3 text-left text-sm text-text transition hover:bg-white/[0.08]">Open review queue</button>
           </div>
         </div>
-        <div className="lumoza-card rounded-[30px] p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Privacy posture</p>
-          <h3 className="mt-2 text-xl font-semibold text-text">Local processing first</h3>
-          <p className="mt-4 text-sm leading-7 text-muted">Project databases, thumbnails, analysis results, and future face crops live in app-managed project storage. Originals remain read-only.</p>
+        <div className="rounded-[30px] bg-white/[0.03] p-5 text-sm text-muted">
+          <div className="flex items-center gap-2 text-text"><Clock3 className="h-4 w-4 text-accent" /> Recent</div>
+          <p className="mt-3 truncate text-subtle">{latestProject ? latestProject.name : "No recent project"}</p>
         </div>
-      </section>
+      </aside>
     </div>
   );
 }

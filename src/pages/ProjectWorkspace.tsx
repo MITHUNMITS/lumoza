@@ -1,6 +1,8 @@
+import { BrainCircuit, ScanLine, Sparkles, UsersRound } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
-import { getThumbnailPipelineSummary } from "../services/thumbnailService";
+import { LumozaButton } from "../components/ui/LumozaButton";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
 
@@ -32,8 +34,16 @@ function averageQualityScore(photos: ProjectPhoto[]) {
   if (scored.length === 0) {
     return undefined;
   }
-  const total = scored.reduce((sum, photo) => sum + (photo.quality?.overallScore ?? 0), 0);
-  return total / scored.length;
+  return scored.reduce((sum, photo) => sum + (photo.quality?.overallScore ?? 0), 0) / scored.length;
+}
+
+function CompactStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl bg-white/[0.045] px-4 py-3">
+      <p className="font-mono text-lg text-text">{value}</p>
+      <p className="mt-1 text-xs text-subtle">{label}</p>
+    </div>
+  );
 }
 
 export function ProjectWorkspace({
@@ -58,41 +68,38 @@ export function ProjectWorkspace({
   onResume,
   onCancel,
 }: ProjectWorkspaceProps) {
-  const thumbnailSummary = getThumbnailPipelineSummary(task);
   const averageScore = analysisSummary?.averageOverallScore ?? averageQualityScore(photos);
   const duplicateGroupCount = analysisTask?.duplicateGroupCount ?? analysisSummary?.duplicateGroupCount ?? 0;
   const burstGroupCount = analysisTask?.burstGroupCount ?? analysisSummary?.burstGroupCount ?? 0;
   const keepCount = analysisTask?.keepCount ?? analysisSummary?.keepCount ?? 0;
   const reviewCount = analysisTask?.reviewCount ?? analysisSummary?.reviewCount ?? 0;
-  const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
-  const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
   const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
   const detectedFaceCount = peopleSummary?.detectedFaceCount ?? 0;
   const clusteredPeopleCount = peopleSummary?.clusteredPeopleCount ?? 0;
-  const priorityPeopleCount = peopleSummary?.priorityPeopleCount ?? 0;
-  const photosWithFacesCount = peopleSummary?.photosWithFacesCount ?? 0;
-  const visibleAlbumCandidates = albumCandidates.slice(0, 5);
-  const visibleReviewQueue = reviewQueue.slice(0, 5);
-  const visibleDuplicateGroups = groupSummaries.filter((group) => group.groupingType === "duplicate").slice(0, 3);
-  const visibleBurstGroups = groupSummaries.filter((group) => group.groupingType === "burst").slice(0, 3);
-  const analyzedCount = analysisTask?.analyzedCount ?? analysisSummary?.analyzedPhotoCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length;
+  const visibleAlbumCandidates = albumCandidates.slice(0, 4);
+  const latestActivity = activity.slice(0, 3);
+  const activeGroups = groupSummaries.slice(0, 4);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-      <section className="grid gap-5">
-        <div className="lumoza-card rounded-[28px] p-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Project Workspace</p>
-              <h2 className="mt-2 text-3xl font-semibold text-text">{project.name}</h2>
-              <p className="mt-3 text-sm text-muted">{project.rootFolder}</p>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
+      <section className="min-w-0 space-y-4">
+        <div className="relative overflow-hidden rounded-[34px] bg-ink/38 p-5 shadow-soft">
+          <div className="absolute right-0 top-0 h-28 w-56 rounded-full bg-accent/10 blur-3xl" />
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill tone="accent">Workspace</StatusPill>
+                <StatusPill tone="muted">{photos.length}{hasMorePhotos ? "+" : ""} photos</StatusPill>
+              </div>
+              <h2 className="mt-3 truncate text-3xl font-semibold tracking-[-0.05em] text-text">{project.name}</h2>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={onStartAnalysis} className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-text">Run analysis</button>
-              <button type="button" onClick={onStartScan} className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white">Start scan</button>
+            <div className="flex flex-wrap gap-2">
+              <LumozaButton type="button" onClick={onStartAnalysis} variant="secondary"><BrainCircuit className="h-4 w-4" /> Analyze</LumozaButton>
+              <LumozaButton type="button" onClick={onStartScan} variant="primary"><ScanLine className="h-4 w-4" /> Scan</LumozaButton>
             </div>
           </div>
         </div>
+
         <ProjectPhotoGrid
           photos={photos}
           isLoading={isLoadingPhotos}
@@ -103,193 +110,67 @@ export function ProjectWorkspace({
         />
       </section>
 
-      <section className="grid gap-5">
+      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Analysis and ranking</p>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            {analysisTask
-              ? analysisTask.message
-              : averageScore !== undefined
-                ? `Latest average technical score ${(averageScore * 100).toFixed(0)}%.`
-                : "Run Phase 2 analysis to compute technical quality metrics for this project."}
-          </p>
-          <div className="mt-4 grid gap-2 text-sm text-muted">
-            <div className="flex items-center justify-between">
-              <span>Analyzed photos</span>
-              <span className="text-text">{analyzedCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Average score</span>
-              <span className="text-text">{((analysisTask?.averageScore ?? averageScore ?? 0) * 100).toFixed(0)}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Duplicate groups</span>
-              <span className="text-text">{duplicateGroupCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Burst groups</span>
-              <span className="text-text">{burstGroupCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Keep picks</span>
-              <span className="text-text">{keepCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Review picks</span>
-              <span className="text-text">{reviewCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Reject picks</span>
-              <span className="text-text">{rejectCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>High-confidence decisions</span>
-              <span className="text-text">{highConfidenceCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Album candidates</span>
-              <span className="text-text">{albumCandidateCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Analysis failures</span>
-              <span className="text-text">{analysisTask?.failedCount ?? 0}</span>
-            </div>
+
+        <section className="rounded-[30px] bg-white/[0.035] p-5 shadow-soft">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-text"><Sparkles className="h-4 w-4 text-accent" /> AI picks</div>
+            <span className="text-xs text-subtle">{analysisTask?.status ?? "ready"}</span>
           </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">People intelligence</p>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            Phase 3 schema and summary plumbing are ready. Real face detection and clustering will populate this panel in the next intelligence slice.
-          </p>
-          <div className="mt-4 grid gap-2 text-sm text-muted">
-            <div className="flex items-center justify-between">
-              <span>Detected faces</span>
-              <span className="text-text">{detectedFaceCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Photos with faces</span>
-              <span className="text-text">{photosWithFacesCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>People clusters</span>
-              <span className="text-text">{clusteredPeopleCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Priority people</span>
-              <span className="text-text">{priorityPeopleCount}</span>
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CompactStat label="Keep" value={keepCount} />
+            <CompactStat label="Review" value={reviewCount} />
+            <CompactStat label="Album" value={albumCandidateCount} />
+            <CompactStat label="Score" value={`${((analysisTask?.averageScore ?? averageScore ?? 0) * 100).toFixed(0)}%`} />
           </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Group audit</p>
-          <div className="mt-4 grid gap-4 text-sm text-muted">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-subtle">Duplicate clusters</p>
-              <div className="mt-3 space-y-2">
-                {visibleDuplicateGroups.length === 0 ? (
-                  <p className="text-sm leading-7 text-muted">Duplicate clusters will appear after analysis.</p>
-                ) : (
-                  visibleDuplicateGroups.map((group) => (
-                    <div key={group.groupId} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
-                        <span className="text-warning">{group.memberCount} frames</span>
-                      </div>
-                      <p className="mt-2 text-xs text-subtle">{group.averageSimilarity !== undefined ? `${(group.averageSimilarity * 100).toFixed(0)}% average similarity` : "Similarity pending"}</p>
-                    </div>
-                  ))
-                )}
+          {analysisTask ? <p className="mt-4 line-clamp-2 text-xs leading-5 text-muted">{analysisTask.message}</p> : null}
+        </section>
+
+        <section className="rounded-[30px] bg-white/[0.03] p-5 shadow-soft">
+          <div className="mb-4 flex items-center gap-2 text-text"><UsersRound className="h-4 w-4 text-purple" /> People</div>
+          <div className="grid grid-cols-2 gap-2">
+            <CompactStat label="Faces" value={detectedFaceCount} />
+            <CompactStat label="People" value={clusteredPeopleCount} />
+          </div>
+        </section>
+
+        <section className="rounded-[30px] bg-white/[0.03] p-5 shadow-soft">
+          <p className="mb-3 text-sm text-text">Shortlist</p>
+          <div className="space-y-2">
+            {visibleAlbumCandidates.length === 0 ? <p className="text-sm text-subtle">Run analysis for keep picks.</p> : null}
+            {visibleAlbumCandidates.map((photo) => (
+              <div key={photo.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.045] px-3 py-2 text-sm">
+                <span className="truncate text-muted">{photo.filename}</span>
+                <span className="font-mono text-xs text-accent">{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)}%` : "pick"}</span>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[30px] bg-white/[0.03] p-5 shadow-soft">
+          <p className="mb-3 text-sm text-text">Grouping</p>
+          <div className="grid grid-cols-2 gap-2">
+            <CompactStat label="Duplicate" value={duplicateGroupCount} />
+            <CompactStat label="Burst" value={burstGroupCount} />
+          </div>
+          {activeGroups.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {activeGroups.map((group) => (
+                <div key={group.groupId} className="truncate rounded-2xl bg-white/[0.04] px-3 py-2 text-xs text-muted">{group.bestFilename ?? group.groupId}</div>
+              ))}
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-subtle">Burst clusters</p>
-              <div className="mt-3 space-y-2">
-                {visibleBurstGroups.length === 0 ? (
-                  <p className="text-sm leading-7 text-muted">Burst clusters will appear after analysis.</p>
-                ) : (
-                  visibleBurstGroups.map((group) => (
-                    <div key={group.groupId} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
-                        <span className="text-accent">{group.memberCount} frames</span>
-                      </div>
-                      <p className="mt-2 text-xs text-subtle">{group.averageSimilarity !== undefined ? `${(group.averageSimilarity * 100).toFixed(0)}% average similarity` : "Similarity pending"}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-[30px] bg-white/[0.025] p-5 text-sm text-muted shadow-soft">
+          <p className="mb-3 text-text">Activity</p>
+          {latestActivity.length === 0 ? <p className="text-subtle">No recent events.</p> : null}
+          <div className="space-y-2">
+            {latestActivity.map((item) => <p key={item.id} className="line-clamp-2 rounded-2xl bg-white/[0.04] px-3 py-2">{item.message}</p>)}
           </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Album shortlist</p>
-          <div className="mt-4 space-y-3">
-            {visibleAlbumCandidates.length === 0 ? (
-              <p className="text-sm leading-7 text-muted">Run analysis to surface high-confidence keep picks for album review.</p>
-            ) : (
-              visibleAlbumCandidates.map((photo) => (
-                <div key={photo.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate text-text">{photo.filename}</span>
-                    <span className="text-accent">{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)}%` : "candidate"}</span>
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-subtle">{photo.selectionReason ?? "Selection reason pending"}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Review queue</p>
-          <div className="mt-4 space-y-3">
-            {visibleReviewQueue.length === 0 ? (
-              <p className="text-sm leading-7 text-muted">Ambiguous ranking decisions will appear here after analysis.</p>
-            ) : (
-              visibleReviewQueue.map((photo) => (
-                <div key={photo.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate text-text">{photo.filename}</span>
-                    <span className="text-warning">{photo.selectionLabel ?? "review"}</span>
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-subtle">{photo.selectionReason ?? "Selection reason pending"}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">{thumbnailSummary.title}</p>
-          <p className="mt-3 text-sm leading-7 text-muted">{thumbnailSummary.detail}</p>
-          <div className="mt-4 grid gap-2 text-sm text-muted">
-            <div className="flex items-center justify-between">
-              <span>Generated previews</span>
-              <span className="text-text">{thumbnailSummary.generatedCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Failed previews</span>
-              <span className="text-text">{thumbnailSummary.failedCount}</span>
-            </div>
-          </div>
-        </div>
-        <div className="lumoza-card rounded-[28px] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Activity log</p>
-          <div className="mt-4 space-y-3">
-            {activity.length === 0 ? (
-              <p className="text-sm text-subtle">No activity entries yet.</p>
-            ) : (
-              activity.map((item) => (
-                <div key={item.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
-                  <div className="flex items-center justify-between gap-4 text-sm">
-                    <span className="text-text">{item.message}</span>
-                    <span className="text-subtle">{new Date(item.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
+        </section>
+      </aside>
     </div>
   );
 }

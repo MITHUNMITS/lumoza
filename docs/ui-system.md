@@ -34,7 +34,9 @@ Lumoza Studio should feel like premium creative desktop software: cinematic, cal
 ## Screen Rules
 
 - Photos are the hero in workspace and review surfaces
-- Metrics should be compact and contextual, not dashboard-heavy
+- Home should feel like a memory hub, not an analytics dashboard
+- Metrics should be compact, contextual, and mostly secondary
+- Keep explanatory copy out of primary creative surfaces unless it directly guides action
 - People, review, final selection, AI models, and exports can have visible slots, but future phase logic must not be implemented early
 - Every async or empty state should provide guidance and preserve layout stability
 - Accessibility requires visible focus states and readable contrast
@@ -42,3 +44,7 @@ Lumoza Studio should feel like premium creative desktop software: cinematic, cal
 ## Current Scope
 
 This UI pass redesigns the current Phase 1-3 surfaces and prepares future slots. It does not implement Phase 3 detection/clustering, Phase 4 final selection, Phase 5 storytelling, or Phase 6 packaging/model downloads.
+
+## Studio Refinement
+
+The second UI refinement reduces visible dashboard patterns: the sidebar is icon-first, the homepage removes metric-card emphasis, project cards become cinematic previews, and the workspace gives the photo grid the dominant surface with a compact AI rail.
