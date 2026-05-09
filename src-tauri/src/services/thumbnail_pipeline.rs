@@ -8,10 +8,7 @@ use std::{
 use anyhow::Result;
 use image::{GenericImageView, ImageFormat};
 
-use crate::{
-    services::scan_indexer::IndexedPhoto,
-    state::app_state::ScanTaskControl,
-};
+use crate::{services::scan_indexer::IndexedPhoto, state::app_state::ScanTaskControl};
 
 const THUMBNAIL_MAX_DIMENSION: u32 = 320;
 const BATCH_SIZE: usize = 24;

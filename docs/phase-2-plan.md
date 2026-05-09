@@ -2,15 +2,15 @@
 
 ## Goal
 
-Deliver the first real intelligence layer for Lumoza Studio: fast technical-quality analysis, duplicate/burst scaffolding, persisted scoring outputs, and score visibility inside the desktop workspace.
+Deliver the first real intelligence layer for Lumoza Studio: fast technical-quality analysis, duplicate/burst grouping, persisted scoring outputs, ranking confidence, and score visibility inside the desktop workspace.
 
-Current phase status: in progress
+Current phase status: complete
 
-Phase 2 progress: 70% complete
-Phase 2 slice progress: technical quality scoring complete, duplicate and burst grouping active, grouping audit summaries active, ranking confidence, project-wide album shortlist, and review queue queries active
-Full product progress: 45% overall
+Phase 2 progress: 100% complete
+Phase 2 slice progress: technical quality scoring complete, connected-component duplicate grouping complete, burst grouping complete, grouping audit summaries complete, ranking confidence complete, project-wide album shortlist complete, and review queue queries complete
+Full product progress: 52% overall
 
-Duplicate and burst grouping now persist into the Phase 2 analysis model with queryable group summaries, and ranking now produces keep, review, reject, confidence, album shortlist, and review queue recommendations with project-wide query paths.
+Phase 2 is complete as a fast local-first intelligence pass. It produces explainable technical scores, duplicate and burst groups, keep/review/reject guidance, confidence labels, album-candidate recommendations, review queues, and project-wide grouping audit summaries. This is still not the final memory-selection engine; Phase 3 and Phase 4 remain responsible for face intelligence and final selection logic.
 
 ## Phase 2 Deliverables
 
@@ -23,51 +23,65 @@ Duplicate and burst grouping now persist into the Phase 2 analysis model with qu
 - Background analysis task orchestration
 - Analysis progress visibility in workspace and operations
 - Score, confidence, and recommendation badges in the photo browser
-- Duplicate and burst schema scaffold
+- Connected-component duplicate grouping based on perceptual similarity and file-size proximity
+- Burst grouping based on capture-time windows plus filename or visual affinity
+- Persisted duplicate and burst groups with ranked members
+- Explainable curation scores with keep, review, reject, confidence, and album-candidate outputs
+- Project-wide album shortlist query
+- Project-wide review queue query
+- Project-wide grouping audit summary query
 - Python engine contract upgrade from placeholder heartbeat to analysis capability declaration
+- Focused Rust tests for duplicate grouping, burst grouping, duplicate penalties, and confidence thresholds
 
-## Out Of Scope For This Slice
+## Out Of Scope For Phase 2
 
 - Face detection or clustering
 - Final memory ranking
 - Storytelling or album generation
 - Cloud execution
 - Aesthetic or semantic scoring
+- Production installer signing and release operations
 
-## Recommended Build Order
+## Completed Build Order
 
 ### 1. Data Model
 
-- Add Phase 2 migrations for analysis runs and quality metrics
-- Reserve tables for duplicate grouping even if the first slice does not fully populate them
+- Added Phase 2 migrations for analysis runs, quality metrics, duplicate groups, curation scores, confidence, album candidates, and query indexes
+- Reserved and populated duplicate/burst grouping tables for the first deterministic intelligence pass
 
 ### 2. Native Analysis Pipeline
 
-- Load indexed project photos from SQLite
-- Run fast local quality heuristics in a background task
-- Persist results incrementally or at task completion
+- Loaded indexed project photos from SQLite
+- Ran fast local quality heuristics in a background task
+- Persisted analysis outputs and task state at completion
 
 ### 3. Python Engine Contract
 
-- Keep the sidecar lightweight in this slice
-- Expose capabilities and mode so later AI slices can bind to a real sidecar process cleanly
+- Kept the sidecar lightweight in this slice
+- Exposed capabilities and mode so later AI slices can bind to a real sidecar process cleanly
 
 ### 4. Product Surfaces
 
-- Add a workspace control to start quality analysis
-- Show progress and latest score summary in operations
-- Surface overall quality score in the photo grid
+- Added workspace control to start quality analysis
+- Showed progress and latest score summary in operations
+- Surfaced overall quality score, recommendation, confidence, shortlist, and review guidance in the photo grid
+- Added album shortlist, review queue, and grouping audit panels
 
-### 5. Phase 2 Next Steps After This Slice
+### 5. Verification
 
-- Refine duplicate grouping beyond the first deterministic pass
-- Refine burst grouping beyond the first deterministic pass
-- Validate grouping quality, ranking confidence, shortlist quality, and review queue quality against larger real projects
+- TypeScript check passes
+- Frontend production build passes
+- Rust check passes
+- Rust quality analyzer unit tests pass
+- Python sidecar compile check passes
+- Native macOS Tauri build is required as the final phase-boundary validation before push
 
-## Acceptance Criteria For The First Phase 2 Slice
+## Acceptance Criteria
 
 - A scanned project can start technical-quality analysis
 - Each indexed photo can persist a quality score bundle
 - The desktop UI can show analysis progress without freezing
-- The photo browser can display an overall score for analyzed photos
-- The database is ready for duplicate and burst expansion in the next slice
+- The photo browser can display overall scores, recommendations, confidence, shortlist, and review guidance for analyzed photos
+- Duplicate and burst groups are persisted and queryable
+- Project-wide album candidate, review queue, and grouping audit queries are available
+- Grouping and ranking behavior has focused Rust unit coverage

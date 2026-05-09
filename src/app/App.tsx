@@ -544,10 +544,10 @@ export function App() {
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Full product progress: 45%
-        Current phase progress: 70% (Phase 2)
+        Full product progress: 52%
+        Current phase progress: 100% (Phase 2 complete)
 
-Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping audit, ranking confidence, album shortlist guidance, and review queue guidance are active, while face intelligence, deeper ranking, polish, and release work still remain.
+Phase 2 is complete: technical quality scoring, connected duplicate grouping, burst grouping audit, ranking confidence, album shortlist guidance, and review queue guidance are active. Face intelligence, final ranking, polish, and release hardening still remain.
       </div>
     </div>
   );
@@ -555,7 +555,7 @@ Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping audi
   const topbar = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 fast AI engine</p>
+        <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 complete</p>
         <h2 className="mt-2 text-3xl font-semibold text-text">Technical quality, grouping, and first-pass ranking</h2>
       </div>
       <CreateProject onCreate={handleCreateProject} />

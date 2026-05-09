@@ -136,11 +136,18 @@ impl AppRuntime {
     }
 
     pub fn get_task(&self, task_id: &str) -> Option<ScanTaskSnapshot> {
-        self.scan_tasks.lock().ok().and_then(|tasks| tasks.get(task_id).cloned())
+        self.scan_tasks
+            .lock()
+            .ok()
+            .and_then(|tasks| tasks.get(task_id).cloned())
     }
 
     pub fn get_project_task(&self, project_id: &str) -> Option<ScanTaskSnapshot> {
-        let task_id = self.project_tasks.lock().ok().and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
+        let task_id = self
+            .project_tasks
+            .lock()
+            .ok()
+            .and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
         self.get_task(&task_id)
     }
 
@@ -161,7 +168,10 @@ impl AppRuntime {
     }
 
     pub fn control(&self, task_id: &str) -> Option<Arc<ScanTaskControl>> {
-        self.controls.lock().ok().and_then(|controls| controls.get(task_id).cloned())
+        self.controls
+            .lock()
+            .ok()
+            .and_then(|controls| controls.get(task_id).cloned())
     }
 
     pub fn clear_control(&self, task_id: &str) {
@@ -183,15 +193,29 @@ impl AppRuntime {
     }
 
     pub fn get_quality_task(&self, task_id: &str) -> Option<QualityAnalysisTaskSnapshot> {
-        self.quality_tasks.lock().ok().and_then(|tasks| tasks.get(task_id).cloned())
+        self.quality_tasks
+            .lock()
+            .ok()
+            .and_then(|tasks| tasks.get(task_id).cloned())
     }
 
-    pub fn get_project_quality_task(&self, project_id: &str) -> Option<QualityAnalysisTaskSnapshot> {
-        let task_id = self.project_quality_tasks.lock().ok().and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
+    pub fn get_project_quality_task(
+        &self,
+        project_id: &str,
+    ) -> Option<QualityAnalysisTaskSnapshot> {
+        let task_id = self
+            .project_quality_tasks
+            .lock()
+            .ok()
+            .and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
         self.get_quality_task(&task_id)
     }
 
-    pub fn update_quality_task<F>(&self, task_id: &str, mutate: F) -> Option<QualityAnalysisTaskSnapshot>
+    pub fn update_quality_task<F>(
+        &self,
+        task_id: &str,
+        mutate: F,
+    ) -> Option<QualityAnalysisTaskSnapshot>
     where
         F: FnOnce(&mut QualityAnalysisTaskSnapshot),
     {

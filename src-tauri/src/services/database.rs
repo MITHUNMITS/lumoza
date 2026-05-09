@@ -7,7 +7,9 @@ use rusqlite::{params, Connection, Transaction};
 use crate::{
     commands::project::ProjectSummary,
     services::{
-        quality_analyzer::{PhotoCurationScoreRecord, PhotoGroupingRecord, PhotoQualityMetricsRecord},
+        quality_analyzer::{
+            PhotoCurationScoreRecord, PhotoGroupingRecord, PhotoQualityMetricsRecord,
+        },
         scan_indexer::IndexedPhoto,
         thumbnail_pipeline::GeneratedThumbnail,
     },
@@ -193,7 +195,11 @@ pub fn persist_scan(
             "scan_completed",
             if failed_count > 0 { "warning" } else { "info" },
             format!("Indexed {} supported photos.", photos.len()),
-            format!(r#"{{"failedCount": {}, "indexedCount": {}}}"#, failed_count, photos.len()),
+            format!(
+                r#"{{"failedCount": {}, "indexedCount": {}}}"#,
+                failed_count,
+                photos.len()
+            ),
             now.as_str(),
         ],
     )?;
@@ -206,7 +212,11 @@ pub fn persist_scan(
     })
 }
 
-pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+pub fn list_project_photos(
+    path: &Path,
+    offset: u32,
+    limit: u32,
+) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let mut statement = connection.prepare(
@@ -283,8 +293,10 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
     Ok(photos)
 }
 
-
-pub fn list_album_candidate_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+pub fn list_album_candidate_photos(
+    path: &Path,
+    limit: u32,
+) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let safe_limit = limit.clamp(1, 60);
@@ -363,8 +375,10 @@ pub fn list_album_candidate_photos(path: &Path, limit: u32) -> anyhow::Result<Ve
     Ok(photos)
 }
 
-
-pub fn list_review_queue_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+pub fn list_review_queue_photos(
+    path: &Path,
+    limit: u32,
+) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let safe_limit = limit.clamp(1, 80);
@@ -448,8 +462,10 @@ pub fn list_review_queue_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<P
     Ok(photos)
 }
 
-
-pub fn list_curation_group_summaries(path: &Path, limit: u32) -> anyhow::Result<Vec<CurationGroupSummaryRecord>> {
+pub fn list_curation_group_summaries(
+    path: &Path,
+    limit: u32,
+) -> anyhow::Result<Vec<CurationGroupSummaryRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let safe_limit = limit.clamp(1, 80);
@@ -497,11 +513,10 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
 
-    let analyzed_photo_count = connection.query_row(
-        "SELECT COUNT(*) FROM photo_quality_metrics",
-        [],
-        |row| Ok(row.get::<_, i64>(0)? as u64),
-    )?;
+    let analyzed_photo_count =
+        connection.query_row("SELECT COUNT(*) FROM photo_quality_metrics", [], |row| {
+            Ok(row.get::<_, i64>(0)? as u64)
+        })?;
 
     let average_overall_score = connection.query_row(
         "SELECT AVG(overall_score) FROM photo_quality_metrics",
@@ -662,7 +677,13 @@ pub fn persist_quality_analysis(
         }
     }
 
-    persist_group_records(&transaction, analysis_run_id, duplicate_groups, "duplicate", &now)?;
+    persist_group_records(
+        &transaction,
+        analysis_run_id,
+        duplicate_groups,
+        "duplicate",
+        &now,
+    )?;
     persist_group_records(&transaction, analysis_run_id, burst_groups, "burst", &now)?;
 
     {
@@ -778,7 +799,12 @@ fn persist_group_records(
 
     for (index, group) in groups.iter().enumerate() {
         let group_id = format!("{}:{}:{}", grouping_type, analysis_run_id, index);
-        group_statement.execute(params![group_id.as_str(), analysis_run_id, grouping_type, now])?;
+        group_statement.execute(params![
+            group_id.as_str(),
+            analysis_run_id,
+            grouping_type,
+            now
+        ])?;
         for member in &group.members {
             member_statement.execute(params![
                 group_id.as_str(),
@@ -839,9 +865,8 @@ pub fn persist_thumbnail_updates(
     }
 
     {
-        let mut failed_statement = transaction.prepare(
-            "UPDATE photos SET thumbnail_status = 'failed' WHERE id = ?1",
-        )?;
+        let mut failed_statement =
+            transaction.prepare("UPDATE photos SET thumbnail_status = 'failed' WHERE id = ?1")?;
         for photo_id in failed_photo_ids {
             failed_statement.execute(params![photo_id.as_str()])?;
         }
@@ -854,7 +879,11 @@ pub fn persist_thumbnail_updates(
             params![
                 format!("thumb-update-{}", now),
                 "thumbnails_generated",
-                if failed_photo_ids.is_empty() { "info" } else { "warning" },
+                if failed_photo_ids.is_empty() {
+                    "info"
+                } else {
+                    "warning"
+                },
                 format!(
                     "Generated {} thumbnails and skipped {} unsupported or unreadable files.",
                     generated.len(),
@@ -876,10 +905,12 @@ pub fn persist_thumbnail_updates(
 
 fn open_connection(path: &Path) -> anyhow::Result<Connection> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("failed to create {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
     }
 
-    let connection = Connection::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let connection =
+        Connection::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     connection.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
     Ok(connection)
 }
@@ -893,7 +924,11 @@ fn apply_migrations(connection: &Connection, path: &Path) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn upsert_project(transaction: &Transaction<'_>, project: &ProjectSummary, now: &str) -> anyhow::Result<()> {
+fn upsert_project(
+    transaction: &Transaction<'_>,
+    project: &ProjectSummary,
+    now: &str,
+) -> anyhow::Result<()> {
     transaction.execute(
         "INSERT INTO projects (id, name, root_folder, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)
@@ -912,7 +947,11 @@ fn upsert_project(transaction: &Transaction<'_>, project: &ProjectSummary, now: 
     Ok(())
 }
 
-fn upsert_source_folder(transaction: &Transaction<'_>, project: &ProjectSummary, now: &str) -> anyhow::Result<()> {
+fn upsert_source_folder(
+    transaction: &Transaction<'_>,
+    project: &ProjectSummary,
+    now: &str,
+) -> anyhow::Result<()> {
     transaction.execute(
         "INSERT INTO source_folders (id, absolute_path, scan_policy, created_at)
          VALUES (?1, ?2, ?3, ?4)

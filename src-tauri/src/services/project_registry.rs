@@ -19,7 +19,8 @@ fn registry_path(app: &AppHandle) -> anyhow::Result<PathBuf> {
 fn write_registry(app: &AppHandle, projects: &[ProjectSummary]) -> anyhow::Result<()> {
     let path = registry_path(app)?;
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("failed to create {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
     }
 
     let payload = serde_json::to_string_pretty(&ProjectRegistry {
@@ -35,8 +36,10 @@ pub fn load_registry(app: &AppHandle) -> anyhow::Result<Vec<ProjectSummary>> {
         return Ok(Vec::new());
     }
 
-    let raw = fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    let registry: ProjectRegistry = serde_json::from_str(&raw).context("failed to parse project registry")?;
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    let registry: ProjectRegistry =
+        serde_json::from_str(&raw).context("failed to parse project registry")?;
     Ok(registry.projects)
 }
 

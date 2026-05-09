@@ -4,10 +4,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use image::GenericImageView;
 
-use crate::{
-    services::database::AnalysisPhotoRecord,
-    state::app_state::ScanTaskControl,
-};
+use crate::{services::database::AnalysisPhotoRecord, state::app_state::ScanTaskControl};
 
 #[derive(Debug, Clone)]
 pub struct PhotoQualityMetricsRecord {
@@ -93,18 +90,31 @@ where
         let average_score = if result.metrics.is_empty() {
             0.0
         } else {
-            result.metrics.iter().map(|entry| entry.overall_score).sum::<f64>() / result.metrics.len() as f64
+            result
+                .metrics
+                .iter()
+                .map(|entry| entry.overall_score)
+                .sum::<f64>()
+                / result.metrics.len() as f64
         };
-        on_progress((index + 1) as u64, result.failed_photo_ids.len() as u64, average_score);
+        on_progress(
+            (index + 1) as u64,
+            result.failed_photo_ids.len() as u64,
+            average_score,
+        );
     }
 
     finalize_result(result, artifacts)
 }
 
-fn finalize_result(mut result: QualityAnalysisResult, artifacts: Vec<PhotoAnalysisArtifact>) -> QualityAnalysisResult {
+fn finalize_result(
+    mut result: QualityAnalysisResult,
+    artifacts: Vec<PhotoAnalysisArtifact>,
+) -> QualityAnalysisResult {
     result.duplicate_groups = build_duplicate_groups(&artifacts);
     result.burst_groups = build_burst_groups(&artifacts);
-    result.curation_scores = build_curation_scores(&artifacts, &result.duplicate_groups, &result.burst_groups);
+    result.curation_scores =
+        build_curation_scores(&artifacts, &result.duplicate_groups, &result.burst_groups);
     result
 }
 
@@ -118,7 +128,10 @@ fn analyze_photo(photo: &AnalysisPhotoRecord) -> Result<PhotoAnalysisArtifact> {
     let contrast_score = score_contrast(&grayscale);
     let resolution_score = score_resolution(width, height);
     let overall_score = clamp_score(
-        sharpness_score * 0.34 + exposure_score * 0.22 + contrast_score * 0.22 + resolution_score * 0.22,
+        sharpness_score * 0.34
+            + exposure_score * 0.22
+            + contrast_score * 0.22
+            + resolution_score * 0.22,
     );
 
     let metrics = PhotoQualityMetricsRecord {
@@ -141,24 +154,37 @@ fn analyze_photo(photo: &AnalysisPhotoRecord) -> Result<PhotoAnalysisArtifact> {
 }
 
 fn build_duplicate_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroupingRecord> {
-    let mut groups = Vec::new();
-    let mut assigned = vec![false; artifacts.len()];
+    use std::collections::VecDeque;
 
-    for i in 0..artifacts.len() {
-        if assigned[i] {
+    let mut adjacency = vec![Vec::<usize>::new(); artifacts.len()];
+    for left in 0..artifacts.len() {
+        for right in (left + 1)..artifacts.len() {
+            if are_duplicate_neighbors(&artifacts[left], &artifacts[right]) {
+                adjacency[left].push(right);
+                adjacency[right].push(left);
+            }
+        }
+    }
+
+    let mut visited = vec![false; artifacts.len()];
+    let mut groups = Vec::new();
+
+    for start in 0..artifacts.len() {
+        if visited[start] {
             continue;
         }
 
-        let mut members = vec![i];
-        for j in (i + 1)..artifacts.len() {
-            if assigned[j] {
-                continue;
-            }
+        let mut queue = VecDeque::from([start]);
+        let mut members = Vec::new();
+        visited[start] = true;
 
-            let distance = hamming_distance(artifacts[i].perceptual_hash, artifacts[j].perceptual_hash);
-            let size_ratio = size_ratio(artifacts[i].file_size_bytes, artifacts[j].file_size_bytes);
-            if distance <= 6 && size_ratio >= 0.92 {
-                members.push(j);
+        while let Some(index) = queue.pop_front() {
+            members.push(index);
+            for &neighbor in &adjacency[index] {
+                if !visited[neighbor] {
+                    visited[neighbor] = true;
+                    queue.push_back(neighbor);
+                }
             }
         }
 
@@ -166,36 +192,16 @@ fn build_duplicate_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroup
             continue;
         }
 
-        for &index in &members {
-            assigned[index] = true;
-        }
-
-        members.sort_by(|left, right| {
-            artifacts[*right]
-                .metrics
-                .overall_score
-                .partial_cmp(&artifacts[*left].metrics.overall_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        let exemplar_hash = artifacts[members[0]].perceptual_hash;
-        let group_members = members
-            .iter()
-            .enumerate()
-            .map(|(rank, index)| PhotoGroupingMemberRecord {
-                photo_id: artifacts[*index].photo_id.clone(),
-                similarity_score: 1.0 - hamming_distance(exemplar_hash, artifacts[*index].perceptual_hash) as f64 / 64.0,
-                rank_order: rank as i64,
-            })
-            .collect();
-
-        groups.push(PhotoGroupingRecord {
-            grouping_type: "duplicate".into(),
-            members: group_members,
-        });
+        groups.push(build_similarity_group("duplicate", members, artifacts));
     }
 
     groups
+}
+
+fn are_duplicate_neighbors(left: &PhotoAnalysisArtifact, right: &PhotoAnalysisArtifact) -> bool {
+    let distance = hamming_distance(left.perceptual_hash, right.perceptual_hash);
+    let size_ratio = size_ratio(left.file_size_bytes, right.file_size_bytes);
+    distance <= 7 && size_ratio >= 0.90
 }
 
 fn build_burst_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroupingRecord> {
@@ -239,35 +245,52 @@ fn build_burst_groups(artifacts: &[PhotoAnalysisArtifact]) -> Vec<PhotoGroupingR
     groups
 }
 
-fn build_burst_group(indices: &[usize], artifacts: &[PhotoAnalysisArtifact]) -> PhotoGroupingRecord {
-    let mut sorted = indices.to_vec();
-    sorted.sort_by(|left, right| {
+fn build_burst_group(
+    indices: &[usize],
+    artifacts: &[PhotoAnalysisArtifact],
+) -> PhotoGroupingRecord {
+    build_similarity_group("burst", indices.to_vec(), artifacts)
+}
+
+fn build_similarity_group(
+    grouping_type: &str,
+    mut indices: Vec<usize>,
+    artifacts: &[PhotoAnalysisArtifact],
+) -> PhotoGroupingRecord {
+    indices.sort_by(|left, right| {
         artifacts[*right]
             .metrics
             .overall_score
             .partial_cmp(&artifacts[*left].metrics.overall_score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    let anchor_hash = artifacts[sorted[0]].perceptual_hash;
-    let members = sorted
+    let anchor_hash = artifacts[indices[0]].perceptual_hash;
+    let members = indices
         .iter()
         .enumerate()
         .map(|(rank, index)| PhotoGroupingMemberRecord {
             photo_id: artifacts[*index].photo_id.clone(),
-            similarity_score: 1.0 - hamming_distance(anchor_hash, artifacts[*index].perceptual_hash) as f64 / 64.0,
+            similarity_score: 1.0
+                - hamming_distance(anchor_hash, artifacts[*index].perceptual_hash) as f64 / 64.0,
             rank_order: rank as i64,
         })
         .collect();
 
     PhotoGroupingRecord {
-        grouping_type: "burst".into(),
+        grouping_type: grouping_type.into(),
         members,
     }
 }
 
 fn is_burst_neighbor(left: &PhotoAnalysisArtifact, right: &PhotoAnalysisArtifact) -> bool {
-    let left_timestamp = left.modified_at.as_deref().and_then(parse_timestamp_seconds);
-    let right_timestamp = right.modified_at.as_deref().and_then(parse_timestamp_seconds);
+    let left_timestamp = left
+        .modified_at
+        .as_deref()
+        .and_then(parse_timestamp_seconds);
+    let right_timestamp = right
+        .modified_at
+        .as_deref()
+        .and_then(parse_timestamp_seconds);
     let (Some(left_timestamp), Some(right_timestamp)) = (left_timestamp, right_timestamp) else {
         return false;
     };
@@ -289,7 +312,9 @@ fn normalize_stem(filename: &str) -> String {
         .and_then(|value| value.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    let trimmed = stem.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '_' | '-' | ' '));
+    let trimmed = stem.trim_end_matches(|character: char| {
+        character.is_ascii_digit() || matches!(character, '_' | '-' | ' ')
+    });
     if trimmed.is_empty() {
         stem
     } else {
@@ -298,7 +323,9 @@ fn normalize_stem(filename: &str) -> String {
 }
 
 fn parse_timestamp_seconds(value: &str) -> Option<i64> {
-    DateTime::parse_from_rfc3339(value).ok().map(|datetime| datetime.with_timezone(&Utc).timestamp())
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|datetime| datetime.with_timezone(&Utc).timestamp())
 }
 
 fn difference_hash(image: &image::GrayImage) -> u64 {
@@ -360,12 +387,28 @@ fn build_curation_scores(
             let burst_rank = burst_positions.get(&artifact.photo_id).copied();
             let duplicate_penalty = duplicate_penalty(duplicate_rank);
             let burst_penalty = burst_penalty(burst_rank);
-            let ranking_score = clamp_score(artifact.metrics.overall_score - duplicate_penalty - burst_penalty);
+            let ranking_score =
+                clamp_score(artifact.metrics.overall_score - duplicate_penalty - burst_penalty);
             let selection_label = selection_label(ranking_score);
-            let confidence_score = confidence_score(ranking_score, artifact.metrics.overall_score, duplicate_rank, burst_rank);
+            let confidence_score = confidence_score(
+                ranking_score,
+                artifact.metrics.overall_score,
+                duplicate_rank,
+                burst_rank,
+            );
             let confidence_label = confidence_label(confidence_score);
-            let album_candidate = is_album_candidate(selection_label, confidence_score, duplicate_rank, burst_rank);
-            let selection_reason = selection_reason(artifact.metrics.overall_score, duplicate_rank, burst_rank, confidence_label);
+            let album_candidate = is_album_candidate(
+                selection_label,
+                confidence_score,
+                duplicate_rank,
+                burst_rank,
+            );
+            let selection_reason = selection_reason(
+                artifact.metrics.overall_score,
+                duplicate_rank,
+                burst_rank,
+                confidence_label,
+            );
 
             PhotoCurationScoreRecord {
                 photo_id: artifact.photo_id.clone(),
@@ -408,8 +451,15 @@ fn selection_label(score: f64) -> &'static str {
     }
 }
 
-fn confidence_score(ranking_score: f64, overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> f64 {
-    let distance_from_review_edge = (ranking_score - 0.56).abs().min((ranking_score - 0.78).abs());
+fn confidence_score(
+    ranking_score: f64,
+    overall_score: f64,
+    duplicate_rank: Option<usize>,
+    burst_rank: Option<usize>,
+) -> f64 {
+    let distance_from_review_edge = (ranking_score - 0.56)
+        .abs()
+        .min((ranking_score - 0.78).abs());
     let boundary_confidence = clamp_score(0.48 + distance_from_review_edge * 2.4);
     let quality_confidence = clamp_score(overall_score * 0.7 + ranking_score * 0.3);
     let grouping_confidence = match (duplicate_rank, burst_rank) {
@@ -432,14 +482,24 @@ fn confidence_label(score: f64) -> &'static str {
     }
 }
 
-fn is_album_candidate(selection_label: &str, confidence_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> bool {
+fn is_album_candidate(
+    selection_label: &str,
+    confidence_score: f64,
+    duplicate_rank: Option<usize>,
+    burst_rank: Option<usize>,
+) -> bool {
     selection_label == "keep"
         && confidence_score >= 0.72
         && !matches!(duplicate_rank, Some(rank) if rank > 0)
         && !matches!(burst_rank, Some(rank) if rank > 1)
 }
 
-fn selection_reason(overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>, confidence_label: &str) -> String {
+fn selection_reason(
+    overall_score: f64,
+    duplicate_rank: Option<usize>,
+    burst_rank: Option<usize>,
+    confidence_label: &str,
+) -> String {
     let quality_note = if overall_score >= 0.82 {
         "strong technical quality"
     } else if overall_score >= 0.68 {
@@ -546,4 +606,129 @@ fn mean_luminance(image: &image::GrayImage) -> f64 {
 
 fn clamp_score(value: f64) -> f64 {
     value.clamp(0.0, 1.0)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn artifact(
+        id: &str,
+        hash: u64,
+        score: f64,
+        modified_at: Option<&str>,
+        filename: &str,
+        file_size_bytes: u64,
+    ) -> PhotoAnalysisArtifact {
+        PhotoAnalysisArtifact {
+            photo_id: id.to_string(),
+            metrics: PhotoQualityMetricsRecord {
+                photo_id: id.to_string(),
+                sharpness_score: score,
+                exposure_score: score,
+                contrast_score: score,
+                resolution_score: score,
+                overall_score: score,
+            },
+            perceptual_hash: hash,
+            modified_at: modified_at.map(str::to_string),
+            filename: filename.to_string(),
+            file_size_bytes,
+        }
+    }
+
+    #[test]
+    fn duplicate_grouping_uses_connected_components() {
+        let artifacts = vec![
+            artifact("a", 0, 0.70, None, "a.jpg", 1_000),
+            artifact("b", 0b00000000_01111111, 0.82, None, "b.jpg", 1_020),
+            artifact("c", 0b00111111_11111111, 0.76, None, "c.jpg", 980),
+            artifact("d", 0xffff_ffff_ffff_ffff, 0.95, None, "d.jpg", 1_000),
+        ];
+
+        let groups = build_duplicate_groups(&artifacts);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].members.len(), 3);
+        assert_eq!(groups[0].members[0].photo_id, "b");
+        assert_eq!(groups[0].members[0].rank_order, 0);
+    }
+
+    #[test]
+    fn burst_grouping_uses_time_and_visual_affinity() {
+        let artifacts = vec![
+            artifact(
+                "a",
+                0b0000,
+                0.70,
+                Some("2026-05-09T10:00:00Z"),
+                "IMG_0001.jpg",
+                1_000,
+            ),
+            artifact(
+                "b",
+                0b0001,
+                0.90,
+                Some("2026-05-09T10:00:02Z"),
+                "IMG_0002.jpg",
+                1_000,
+            ),
+            artifact(
+                "c",
+                0b0011,
+                0.80,
+                Some("2026-05-09T10:00:04Z"),
+                "IMG_0003.jpg",
+                1_000,
+            ),
+            artifact(
+                "d",
+                0b1111_0000,
+                0.85,
+                Some("2026-05-09T10:00:10Z"),
+                "OTHER_0100.jpg",
+                1_000,
+            ),
+        ];
+
+        let groups = build_burst_groups(&artifacts);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].members.len(), 3);
+        assert_eq!(groups[0].members[0].photo_id, "b");
+    }
+
+    #[test]
+    fn curation_scores_penalize_lower_ranked_duplicates() {
+        let artifacts = vec![
+            artifact("best", 0b0000, 0.95, None, "best.jpg", 1_000),
+            artifact("second", 0b0001, 0.80, None, "second.jpg", 1_000),
+        ];
+        let duplicate_groups = build_duplicate_groups(&artifacts);
+        let scores = build_curation_scores(&artifacts, &duplicate_groups, &[]);
+        let best = scores
+            .iter()
+            .find(|score| score.photo_id == "best")
+            .unwrap();
+        let second = scores
+            .iter()
+            .find(|score| score.photo_id == "second")
+            .unwrap();
+
+        assert_eq!(best.selection_label, "keep");
+        assert_eq!(best.confidence_label, "high");
+        assert!(best.album_candidate);
+        assert_eq!(second.duplicate_penalty, 0.14);
+        assert!(second.ranking_score < best.ranking_score);
+        assert!(second
+            .selection_reason
+            .contains("lower-ranked duplicate frame"));
+        assert!(!second.album_candidate);
+    }
+
+    #[test]
+    fn confidence_labels_follow_thresholds() {
+        assert_eq!(confidence_label(0.76), "high");
+        assert_eq!(confidence_label(0.58), "medium");
+        assert_eq!(confidence_label(0.57), "low");
+    }
 }

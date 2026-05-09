@@ -40,7 +40,10 @@ pub fn start_quality_analysis(
         message: if photos.is_empty() {
             "No indexed photos are available for technical analysis.".into()
         } else {
-            format!("Analyzing technical quality across {} photos...", photos.len())
+            format!(
+                "Analyzing technical quality across {} photos...",
+                photos.len()
+            )
         },
         analyzed_count: 0,
         failed_count: 0,
@@ -62,14 +65,23 @@ pub fn start_quality_analysis(
     let runtime_clone = runtime.clone();
     let task_id = task.id.clone();
     thread::spawn(move || {
-        run_quality_analysis_task(runtime_clone, task_id, project.project_db_path, photos, control);
+        run_quality_analysis_task(
+            runtime_clone,
+            task_id,
+            project.project_db_path,
+            photos,
+            control,
+        );
     });
 
     Ok(task)
 }
 
 #[tauri::command]
-pub fn get_quality_analysis_task(state: State<AppState>, task_id: String) -> Option<QualityAnalysisTaskResponse> {
+pub fn get_quality_analysis_task(
+    state: State<AppState>,
+    task_id: String,
+) -> Option<QualityAnalysisTaskResponse> {
     state.runtime().get_quality_task(&task_id)
 }
 
@@ -112,15 +124,40 @@ fn run_quality_analysis_task(
     let average_score = if result.metrics.is_empty() {
         0.0
     } else {
-        result.metrics.iter().map(|entry| entry.overall_score).sum::<f64>() / result.metrics.len() as f64
+        result
+            .metrics
+            .iter()
+            .map(|entry| entry.overall_score)
+            .sum::<f64>()
+            / result.metrics.len() as f64
     };
     let duplicate_group_count = result.duplicate_groups.len() as u64;
     let burst_group_count = result.burst_groups.len() as u64;
-    let keep_count = result.curation_scores.iter().filter(|score| score.selection_label == "keep").count() as u64;
-    let review_count = result.curation_scores.iter().filter(|score| score.selection_label == "review").count() as u64;
-    let reject_count = result.curation_scores.iter().filter(|score| score.selection_label == "reject").count() as u64;
-    let high_confidence_count = result.curation_scores.iter().filter(|score| score.confidence_label == "high").count() as u64;
-    let album_candidate_count = result.curation_scores.iter().filter(|score| score.album_candidate).count() as u64;
+    let keep_count = result
+        .curation_scores
+        .iter()
+        .filter(|score| score.selection_label == "keep")
+        .count() as u64;
+    let review_count = result
+        .curation_scores
+        .iter()
+        .filter(|score| score.selection_label == "review")
+        .count() as u64;
+    let reject_count = result
+        .curation_scores
+        .iter()
+        .filter(|score| score.selection_label == "reject")
+        .count() as u64;
+    let high_confidence_count = result
+        .curation_scores
+        .iter()
+        .filter(|score| score.confidence_label == "high")
+        .count() as u64;
+    let album_candidate_count = result
+        .curation_scores
+        .iter()
+        .filter(|score| score.album_candidate)
+        .count() as u64;
 
     let persist_result = database::persist_quality_analysis(
         Path::new(&project_db_path),

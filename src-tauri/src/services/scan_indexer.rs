@@ -1,4 +1,8 @@
-use std::{fs, path::{Path, PathBuf}, time::SystemTime};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -22,7 +26,8 @@ pub struct DiscoveryResult {
     pub cancelled: bool,
 }
 
-const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "heic", "heif", "tif", "tiff"];
+const SUPPORTED_EXTENSIONS: &[&str] =
+    &["jpg", "jpeg", "png", "webp", "heic", "heif", "tif", "tiff"];
 
 pub fn discover_supported_photo_paths<F>(
     root: &Path,

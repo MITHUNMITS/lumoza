@@ -8,27 +8,27 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current full product progress: 45%
-Current active phase progress: 70% (Phase 2)
+Current full product progress: 52%
+Current active phase progress: 100% (Phase 2 complete)
 
 Phase 1 status: 100% complete, including native Rust/Tauri compile and macOS app bundle validation.
-Phase 2 status: 70% complete, with technical-quality scoring, duplicate/burst grouping, grouping audit summaries, ranking confidence, project-wide album shortlist, and review queue queries now in place.
+Phase 2 status: 100% complete, with technical-quality scoring, connected-component duplicate grouping, burst grouping, grouping audit summaries, ranking confidence, project-wide album shortlist, review queue queries, and focused Rust tests in place.
 
 Immediate repo priorities:
 
 1. Preserve the phase-based build discipline defined below.
 2. Use `docs/architecture.md` and `docs/phase-1-plan.md` as the implementation baseline.
-3. Phase 2 has started. Keep implementation focused on fast local analysis and explainable ranking before face intelligence.
+3. Phase 2 is complete. Next implementation should start Phase 3 face intelligence only after explicit phase continuation.
 
 ## Progress Model
 
 Full product progress is tracked separately from phase completion.
 
-Current weighted estimate: `45%` overall.
+Current weighted estimate: `52%` overall.
 
 Basis:
 - Phase 1 foundation: `100%` complete
-- Phase 2 fast AI engine: `70%` complete
+- Phase 2 fast AI engine: `100%` complete
 - Phase 3 face intelligence: `0%` complete
 - Phase 4 smart selection engine: `0%` complete
 - Phase 5 professional polish: `0%` complete

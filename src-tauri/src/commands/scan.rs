@@ -32,7 +32,10 @@ pub fn start_scan(
 
     let root_folder = Path::new(&project.root_folder);
     if !root_folder.exists() {
-        return Err(format!("source folder does not exist: {}", project.root_folder));
+        return Err(format!(
+            "source folder does not exist: {}",
+            project.root_folder
+        ));
     }
 
     project.status = "scanning".into();
@@ -73,7 +76,11 @@ pub fn get_scan_task(state: State<AppState>, task_id: String) -> Option<ScanTask
 }
 
 #[tauri::command]
-pub fn pause_scan(state: State<AppState>, task_id: String, project_id: String) -> Result<ScanTaskResponse, String> {
+pub fn pause_scan(
+    state: State<AppState>,
+    task_id: String,
+    project_id: String,
+) -> Result<ScanTaskResponse, String> {
     let runtime = state.runtime();
     let control = runtime
         .control(&task_id)
@@ -89,7 +96,11 @@ pub fn pause_scan(state: State<AppState>, task_id: String, project_id: String) -
 }
 
 #[tauri::command]
-pub fn resume_scan(state: State<AppState>, task_id: String, project_id: String) -> Result<ScanTaskResponse, String> {
+pub fn resume_scan(
+    state: State<AppState>,
+    task_id: String,
+    project_id: String,
+) -> Result<ScanTaskResponse, String> {
     let runtime = state.runtime();
     let control = runtime
         .control(&task_id)
@@ -105,7 +116,11 @@ pub fn resume_scan(state: State<AppState>, task_id: String, project_id: String) 
 }
 
 #[tauri::command]
-pub fn cancel_scan(state: State<AppState>, task_id: String, project_id: String) -> Result<ScanTaskResponse, String> {
+pub fn cancel_scan(
+    state: State<AppState>,
+    task_id: String,
+    project_id: String,
+) -> Result<ScanTaskResponse, String> {
     let runtime = state.runtime();
     let control = runtime
         .control(&task_id)
@@ -128,7 +143,14 @@ fn run_scan_task(
     control: Arc<ScanTaskControl>,
 ) {
     let result = execute_scan(&runtime, &task_id, &project, &control).and_then(|scan_result| {
-        finalize_scan(&app, &runtime, &task_id, &mut project, &control, scan_result)
+        finalize_scan(
+            &app,
+            &runtime,
+            &task_id,
+            &mut project,
+            &control,
+            scan_result,
+        )
     });
 
     if let Err(error) = result {
@@ -217,7 +239,8 @@ fn execute_scan(
             task.progress_total = discovered_total * 2;
             task.indexed_count = indexed_count;
             task.failed_count = failed_count;
-            task.message = format!("Indexed {indexed_count} of {discovered_total} supported photos...");
+            task.message =
+                format!("Indexed {indexed_count} of {discovered_total} supported photos...");
         });
     }
 
@@ -254,7 +277,10 @@ fn finalize_scan(
             task.progress_total = scan_result.discovered_total * 2;
             task.thumbnail_generated_count = processed.saturating_sub(thumbnail_failed_count);
             task.thumbnail_failed_count = thumbnail_failed_count;
-            task.message = format!("Generating thumbnails... {processed} of {} processed", scan_result.discovered_total);
+            task.message = format!(
+                "Generating thumbnails... {processed} of {} processed",
+                scan_result.discovered_total
+            );
         });
     };
 
@@ -306,8 +332,13 @@ fn finalize_scan(
 
     runtime
         .update_task(task_id, |task| {
-            task.status = if cancelled { "cancelled".into() } else { "completed".into() };
-            task.progress_current = scan_result.discovered_total + thumbnail_generated_count + thumbnail_failed_count;
+            task.status = if cancelled {
+                "cancelled".into()
+            } else {
+                "completed".into()
+            };
+            task.progress_current =
+                scan_result.discovered_total + thumbnail_generated_count + thumbnail_failed_count;
             task.progress_total = scan_result.discovered_total * 2;
             task.indexed_count = persisted.indexed_count;
             task.failed_count = persisted.failed_count;

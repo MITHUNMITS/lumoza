@@ -10,8 +10,15 @@ pub fn initialize(app: &AppHandle) -> anyhow::Result<()> {
         .context("missing app data directory")?
         .join("lumoza");
 
-    for path in [base.clone(), base.join("registry"), base.join("logs"), base.join("cache"), base.join("sidecar")] {
-        std::fs::create_dir_all(&path).with_context(|| format!("failed to create {}", path.display()))?;
+    for path in [
+        base.clone(),
+        base.join("registry"),
+        base.join("logs"),
+        base.join("cache"),
+        base.join("sidecar"),
+    ] {
+        std::fs::create_dir_all(&path)
+            .with_context(|| format!("failed to create {}", path.display()))?;
     }
 
     Ok(())

@@ -81,7 +81,6 @@ pub struct CurationGroupSummaryResponse {
     pub average_similarity: Option<f64>,
 }
 
-
 fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPhotoResponse {
     ProjectPhotoResponse {
         id: photo.id,
@@ -190,7 +189,6 @@ pub fn list_project_album_candidates(
     Ok(photos.into_iter().map(map_project_photo_response).collect())
 }
 
-
 #[tauri::command]
 pub fn list_project_review_queue(
     app: AppHandle,
@@ -209,7 +207,6 @@ pub fn list_project_review_queue(
 
     Ok(photos.into_iter().map(map_project_photo_response).collect())
 }
-
 
 #[tauri::command]
 pub fn list_project_group_summaries(
@@ -241,13 +238,17 @@ pub fn list_project_group_summaries(
 }
 
 #[tauri::command]
-pub fn get_project_analysis_summary(app: AppHandle, project_id: String) -> Result<ProjectAnalysisSummaryResponse, String> {
+pub fn get_project_analysis_summary(
+    app: AppHandle,
+    project_id: String,
+) -> Result<ProjectAnalysisSummaryResponse, String> {
     let project = project_registry::find_project(&app, &project_id)
         .map_err(|error| error.to_string())?
         .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
 
-    let summary = database::get_project_analysis_summary(PathBuf::from(&project.project_db_path).as_path())
-        .map_err(|error| error.to_string())?;
+    let summary =
+        database::get_project_analysis_summary(PathBuf::from(&project.project_db_path).as_path())
+            .map_err(|error| error.to_string())?;
 
     Ok(ProjectAnalysisSummaryResponse {
         analyzed_photo_count: summary.analyzed_photo_count,
