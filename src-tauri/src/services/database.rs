@@ -7,6 +7,7 @@ use rusqlite::{params, Connection, Transaction};
 use crate::{
     commands::project::ProjectSummary,
     services::{
+        people_analyzer::{FaceDetectionRecord, PeopleAnalysisResult, PeopleClusterRecord},
         quality_analyzer::{
             PhotoCurationScoreRecord, PhotoGroupingRecord, PhotoQualityMetricsRecord,
         },
@@ -88,6 +89,34 @@ pub struct ProjectPeopleSummaryRecord {
     pub priority_people_count: u64,
     pub unassigned_face_count: u64,
     pub photos_with_faces_count: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectPersonFaceRecord {
+    pub id: String,
+    pub photo_id: String,
+    pub filename: Option<String>,
+    pub crop_cache_path: Option<String>,
+    pub bounding_box_x: f64,
+    pub bounding_box_y: f64,
+    pub bounding_box_width: f64,
+    pub bounding_box_height: f64,
+    pub detection_confidence: f64,
+    pub quality_score: f64,
+    pub is_representative: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectPersonRecord {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub representative_face_id: Option<String>,
+    pub representative_crop_cache_path: Option<String>,
+    pub face_count: u64,
+    pub photo_count: u64,
+    pub priority_label: String,
+    pub is_hidden: bool,
+    pub faces: Vec<ProjectPersonFaceRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -595,56 +624,399 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
     })
 }
 
-pub fn persist_face_analysis_run(
+pub fn persist_people_analysis(
     path: &Path,
     analysis_run_id: &str,
-    status: &str,
-    engine: &str,
     photos_total: u64,
-    photos_processed: u64,
-    faces_detected: u64,
-    people_clustered: u64,
-    message: &str,
+    result: &PeopleAnalysisResult,
+    cancelled: bool,
 ) -> anyhow::Result<()> {
     let mut connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
     let transaction = connection.transaction()?;
     let now = Utc::now().to_rfc3339();
 
+    transaction.execute("DELETE FROM person_faces", [])?;
+    transaction.execute("DELETE FROM people_clusters", [])?;
+    transaction.execute("DELETE FROM face_detections", [])?;
+    transaction.execute("DELETE FROM face_analysis_runs", [])?;
+
     transaction.execute(
         "INSERT INTO face_analysis_runs (id, status, engine, engine_version, photos_total, photos_processed, faces_detected, people_clustered, started_at, ended_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             analysis_run_id,
-            status,
-            engine,
+            if cancelled { "cancelled" } else { "completed" },
+            "lumoza-rust-cpu-face-candidate-v1",
             env!("CARGO_PKG_VERSION"),
             photos_total as i64,
-            photos_processed as i64,
-            faces_detected as i64,
-            people_clustered as i64,
+            (photos_total.saturating_sub(result.failed_photo_ids.len() as u64)) as i64,
+            result.detections.len() as i64,
+            result.clusters.len() as i64,
             now.as_str(),
             now.as_str(),
         ],
     )?;
 
+    persist_face_detection_records(&transaction, analysis_run_id, &result.detections, &now)?;
+    persist_people_cluster_records(&transaction, &result.clusters, &now)?;
+
     transaction.execute(
         "INSERT INTO activity_log (id, event_type, severity, message, payload_json, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
-            format!("face-analysis-run-{analysis_run_id}"),
-            "people_analysis_prepared",
-            "info",
-            message,
+            format!("people-analysis-run-{analysis_run_id}"),
+            "people_analysis_completed",
+            if result.failed_photo_ids.is_empty() { "info" } else { "warning" },
             format!(
-                r#"{{"photosTotal": {}, "photosProcessed": {}, "facesDetected": {}, "peopleClustered": {}}}"#,
-                photos_total, photos_processed, faces_detected, people_clustered
+                "Prepared people intelligence for {} photos, detected {} face candidates, and organized {} people groups.",
+                photos_total,
+                result.detections.len(),
+                result.clusters.len(),
+            ),
+            format!(
+                r#"{{"failedCount": {}, "facesDetected": {}, "peopleClustered": {}}}"#,
+                result.failed_photo_ids.len(),
+                result.detections.len(),
+                result.clusters.len(),
             ),
             now.as_str(),
         ],
     )?;
 
     transaction.commit()?;
+    Ok(())
+}
+
+fn persist_face_detection_records(
+    transaction: &Transaction<'_>,
+    analysis_run_id: &str,
+    detections: &[FaceDetectionRecord],
+    now: &str,
+) -> anyhow::Result<()> {
+    let mut statement = transaction.prepare(
+        "INSERT INTO face_detections (
+            id,
+            photo_id,
+            analysis_run_id,
+            bounding_box_x,
+            bounding_box_y,
+            bounding_box_width,
+            bounding_box_height,
+            detection_confidence,
+            quality_score,
+            crop_cache_path,
+            embedding_model,
+            embedding_vector_json,
+            created_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+    )?;
+
+    for detection in detections {
+        statement.execute(params![
+            detection.id.as_str(),
+            detection.photo_id.as_str(),
+            analysis_run_id,
+            detection.bounding_box_x,
+            detection.bounding_box_y,
+            detection.bounding_box_width,
+            detection.bounding_box_height,
+            detection.detection_confidence,
+            detection.quality_score,
+            detection.crop_cache_path.as_deref(),
+            detection.embedding_model.as_str(),
+            detection.embedding_vector_json.as_str(),
+            now,
+        ])?;
+    }
+
+    Ok(())
+}
+
+fn persist_people_cluster_records(
+    transaction: &Transaction<'_>,
+    clusters: &[PeopleClusterRecord],
+    now: &str,
+) -> anyhow::Result<()> {
+    let mut cluster_statement = transaction.prepare(
+        "INSERT INTO people_clusters (id, display_name, representative_face_id, face_count, photo_count, priority_label, is_hidden, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+    )?;
+    let mut face_statement = transaction.prepare(
+        "INSERT INTO person_faces (person_id, face_detection_id, cluster_confidence, is_representative)
+         VALUES (?1, ?2, ?3, ?4)",
+    )?;
+
+    for cluster in clusters {
+        cluster_statement.execute(params![
+            cluster.id.as_str(),
+            cluster.display_name.as_deref(),
+            cluster.representative_face_id.as_deref(),
+            cluster.face_count as i64,
+            cluster.photo_count as i64,
+            cluster.priority_label.as_str(),
+            if cluster.is_hidden { 1_i64 } else { 0_i64 },
+            now,
+            now,
+        ])?;
+        for face in &cluster.faces {
+            face_statement.execute(params![
+                face.person_id.as_str(),
+                face.face_detection_id.as_str(),
+                face.cluster_confidence,
+                if face.is_representative { 1_i64 } else { 0_i64 },
+            ])?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn list_project_people(path: &Path) -> anyhow::Result<Vec<ProjectPersonRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let mut statement = connection.prepare(
+        "SELECT p.id, p.display_name, p.representative_face_id, f.crop_cache_path, p.face_count, p.photo_count, p.priority_label, p.is_hidden
+         FROM people_clusters p
+         LEFT JOIN face_detections f ON f.id = p.representative_face_id
+         WHERE p.is_hidden = 0
+         ORDER BY CASE p.priority_label
+             WHEN 'p1' THEN 1 WHEN 'p2' THEN 2 WHEN 'p3' THEN 3 WHEN 'p4' THEN 4 WHEN 'p5' THEN 5 ELSE 9 END,
+             p.face_count DESC,
+             COALESCE(p.display_name, p.id) ASC",
+    )?;
+
+    let rows = statement.query_map([], |row| {
+        Ok(ProjectPersonRecord {
+            id: row.get::<_, String>(0)?,
+            display_name: row.get::<_, Option<String>>(1)?,
+            representative_face_id: row.get::<_, Option<String>>(2)?,
+            representative_crop_cache_path: row.get::<_, Option<String>>(3)?,
+            face_count: row.get::<_, i64>(4)? as u64,
+            photo_count: row.get::<_, i64>(5)? as u64,
+            priority_label: row.get::<_, String>(6)?,
+            is_hidden: row.get::<_, i64>(7)? != 0,
+            faces: Vec::new(),
+        })
+    })?;
+
+    let mut people = Vec::new();
+    for row in rows {
+        let mut person = row?;
+        person.faces = list_person_faces(&connection, &person.id, 12)?;
+        people.push(person);
+    }
+
+    Ok(people)
+}
+
+fn list_person_faces(
+    connection: &Connection,
+    person_id: &str,
+    limit: u32,
+) -> anyhow::Result<Vec<ProjectPersonFaceRecord>> {
+    let mut statement = connection.prepare(
+        "SELECT f.id, f.photo_id, photos.filename, f.crop_cache_path, f.bounding_box_x, f.bounding_box_y, f.bounding_box_width, f.bounding_box_height, f.detection_confidence, f.quality_score, pf.is_representative
+         FROM person_faces pf
+         JOIN face_detections f ON f.id = pf.face_detection_id
+         LEFT JOIN photos ON photos.id = f.photo_id
+         WHERE pf.person_id = ?1
+         ORDER BY pf.is_representative DESC, f.quality_score DESC, f.detection_confidence DESC
+         LIMIT ?2",
+    )?;
+
+    let rows = statement.query_map(params![person_id, limit as i64], |row| {
+        Ok(ProjectPersonFaceRecord {
+            id: row.get::<_, String>(0)?,
+            photo_id: row.get::<_, String>(1)?,
+            filename: row.get::<_, Option<String>>(2)?,
+            crop_cache_path: row.get::<_, Option<String>>(3)?,
+            bounding_box_x: row.get::<_, f64>(4)?,
+            bounding_box_y: row.get::<_, f64>(5)?,
+            bounding_box_width: row.get::<_, f64>(6)?,
+            bounding_box_height: row.get::<_, f64>(7)?,
+            detection_confidence: row.get::<_, f64>(8)?,
+            quality_score: row.get::<_, f64>(9)?,
+            is_representative: row.get::<_, i64>(10)? != 0,
+        })
+    })?;
+
+    let mut faces = Vec::new();
+    for row in rows {
+        faces.push(row?);
+    }
+    Ok(faces)
+}
+
+pub fn update_project_person(
+    path: &Path,
+    person_id: &str,
+    display_name: Option<String>,
+    priority_label: Option<String>,
+    is_hidden: Option<bool>,
+) -> anyhow::Result<()> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let now = Utc::now().to_rfc3339();
+
+    if let Some(name) = display_name {
+        let cleaned = name.trim();
+        let value = if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        };
+        connection.execute(
+            "UPDATE people_clusters SET display_name = ?1, updated_at = ?2 WHERE id = ?3",
+            params![value, now.as_str(), person_id],
+        )?;
+    }
+    if let Some(priority) = priority_label {
+        let normalized = normalize_priority_label(&priority);
+        connection.execute(
+            "UPDATE people_clusters SET priority_label = ?1, updated_at = ?2 WHERE id = ?3",
+            params![normalized.as_str(), now.as_str(), person_id],
+        )?;
+    }
+    if let Some(hidden) = is_hidden {
+        connection.execute(
+            "UPDATE people_clusters SET is_hidden = ?1, updated_at = ?2 WHERE id = ?3",
+            params![if hidden { 1_i64 } else { 0_i64 }, now.as_str(), person_id],
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn merge_project_people(
+    path: &Path,
+    primary_person_id: &str,
+    secondary_person_id: &str,
+) -> anyhow::Result<()> {
+    if primary_person_id == secondary_person_id {
+        return Ok(());
+    }
+    let mut connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let transaction = connection.transaction()?;
+    let now = Utc::now().to_rfc3339();
+
+    transaction.execute(
+        "INSERT OR IGNORE INTO person_faces (person_id, face_detection_id, cluster_confidence, is_representative)
+         SELECT ?1, face_detection_id, cluster_confidence, 0 FROM person_faces WHERE person_id = ?2",
+        params![primary_person_id, secondary_person_id],
+    )?;
+    transaction.execute(
+        "DELETE FROM people_clusters WHERE id = ?1",
+        params![secondary_person_id],
+    )?;
+    recompute_person_cluster(&transaction, primary_person_id, &now)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+pub fn split_project_person_face(
+    path: &Path,
+    face_detection_id: &str,
+    display_name: Option<String>,
+) -> anyhow::Result<()> {
+    let mut connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let transaction = connection.transaction()?;
+    let now = Utc::now().to_rfc3339();
+    let old_person_id: String = transaction.query_row(
+        "SELECT person_id FROM person_faces WHERE face_detection_id = ?1 LIMIT 1",
+        params![face_detection_id],
+        |row| row.get(0),
+    )?;
+    let new_person_id = format!("person:{}", uuid::Uuid::new_v4());
+    let cleaned_name = display_name.and_then(|name| {
+        let trimmed = name.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+
+    transaction.execute(
+        "INSERT INTO people_clusters (id, display_name, representative_face_id, face_count, photo_count, priority_label, is_hidden, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 1, 1, 'unassigned', 0, ?4, ?4)",
+        params![new_person_id.as_str(), cleaned_name.as_deref(), face_detection_id, now.as_str()],
+    )?;
+    transaction.execute(
+        "DELETE FROM person_faces WHERE person_id = ?1 AND face_detection_id = ?2",
+        params![old_person_id.as_str(), face_detection_id],
+    )?;
+    transaction.execute(
+        "INSERT INTO person_faces (person_id, face_detection_id, cluster_confidence, is_representative)
+         VALUES (?1, ?2, 1.0, 1)",
+        params![new_person_id.as_str(), face_detection_id],
+    )?;
+    recompute_or_delete_person_cluster(&transaction, old_person_id.as_str(), &now)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+fn normalize_priority_label(value: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "p1" | "bride" | "groom" => "p1".to_string(),
+        "p2" | "parents" => "p2".to_string(),
+        "p3" | "siblings" => "p3".to_string(),
+        "p4" | "close" | "family" => "p4".to_string(),
+        "p5" | "guests" => "p5".to_string(),
+        _ => "unassigned".to_string(),
+    }
+}
+
+fn recompute_or_delete_person_cluster(
+    transaction: &Transaction<'_>,
+    person_id: &str,
+    now: &str,
+) -> anyhow::Result<()> {
+    let face_count: i64 = transaction.query_row(
+        "SELECT COUNT(*) FROM person_faces WHERE person_id = ?1",
+        params![person_id],
+        |row| row.get(0),
+    )?;
+    if face_count == 0 {
+        transaction.execute(
+            "DELETE FROM people_clusters WHERE id = ?1",
+            params![person_id],
+        )?;
+        return Ok(());
+    }
+    recompute_person_cluster(transaction, person_id, now)
+}
+
+fn recompute_person_cluster(
+    transaction: &Transaction<'_>,
+    person_id: &str,
+    now: &str,
+) -> anyhow::Result<()> {
+    let representative_face_id: Option<String> = transaction.query_row(
+        "SELECT f.id FROM person_faces pf JOIN face_detections f ON f.id = pf.face_detection_id WHERE pf.person_id = ?1 ORDER BY pf.is_representative DESC, f.quality_score DESC, f.detection_confidence DESC LIMIT 1",
+        params![person_id],
+        |row| row.get(0),
+    )?;
+    let face_count: i64 = transaction.query_row(
+        "SELECT COUNT(*) FROM person_faces WHERE person_id = ?1",
+        params![person_id],
+        |row| row.get(0),
+    )?;
+    let photo_count: i64 = transaction.query_row(
+        "SELECT COUNT(DISTINCT f.photo_id) FROM person_faces pf JOIN face_detections f ON f.id = pf.face_detection_id WHERE pf.person_id = ?1",
+        params![person_id],
+        |row| row.get(0),
+    )?;
+    transaction.execute(
+        "UPDATE person_faces SET is_representative = CASE WHEN face_detection_id = ?1 THEN 1 ELSE 0 END WHERE person_id = ?2",
+        params![representative_face_id.as_deref(), person_id],
+    )?;
+    transaction.execute(
+        "UPDATE people_clusters SET representative_face_id = ?1, face_count = ?2, photo_count = ?3, updated_at = ?4 WHERE id = ?5",
+        params![representative_face_id.as_deref(), face_count, photo_count, now, person_id],
+    )?;
     Ok(())
 }
 

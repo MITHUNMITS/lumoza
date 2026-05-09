@@ -56,6 +56,7 @@ export interface PeopleAnalysisTask {
   progressTotal: number;
   message: string;
   processedPhotoCount: number;
+  failedCount: number;
   detectedFaceCount: number;
   clusteredPeopleCount: number;
   modelStatus: string;

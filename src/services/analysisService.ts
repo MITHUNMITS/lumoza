@@ -1,5 +1,5 @@
 import { invokeOrMock } from "./tauriCommands";
-import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary } from "../types/project";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson } from "../types/project";
 import type { PeopleAnalysisTask, QualityAnalysisTask } from "../types/system";
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -59,11 +59,12 @@ function mockPeopleTask(projectId: string): PeopleAnalysisTask {
     status: "completed",
     progressCurrent: 48,
     progressTotal: 48,
-    message: "People workspace prepared. Face AI pack is not installed yet.",
+    message: "People analysis complete: 6 face candidates organized into 3 people groups.",
     processedPhotoCount: 48,
-    detectedFaceCount: 0,
-    clusteredPeopleCount: 0,
-    modelStatus: "face_ai_pack_missing",
+    failedCount: 0,
+    detectedFaceCount: 6,
+    clusteredPeopleCount: 3,
+    modelStatus: "local_cpu_candidate",
   };
 }
 
@@ -98,17 +99,86 @@ export async function getProjectAnalysisSummary(projectId: string): Promise<Proj
 }
 
 
+
+export interface UpdateProjectPersonInput {
+  displayName?: string;
+  priorityLabel?: string;
+  isHidden?: boolean;
+}
+
+function createMockPeople(): ProjectPerson[] {
+  return ["Maya", "Arun", "Family"].map((name, index) => ({
+    id: `mock-person-${index + 1}`,
+    displayName: name,
+    representativeFaceId: `mock-face-${index + 1}`,
+    faceCount: index === 2 ? 2 : 1,
+    photoCount: index === 2 ? 2 : 1,
+    priorityLabel: index === 0 ? "p1" : "unassigned",
+    isHidden: false,
+    faces: [{
+      id: `mock-face-${index + 1}`,
+      photoId: `mock-photo-${index + 1}`,
+      filename: `memory-${index + 1}.jpg`,
+      boundingBoxX: 0.28,
+      boundingBoxY: 0.18,
+      boundingBoxWidth: 0.22,
+      boundingBoxHeight: 0.28,
+      detectionConfidence: 0.82,
+      qualityScore: 0.78,
+      isRepresentative: true,
+    }],
+  }));
+}
+
+export async function listProjectPeople(projectId: string): Promise<ProjectPerson[]> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return createMockPeople();
+  }
+
+  return invokeOrMock<ProjectPerson[]>("list_project_people", { projectId }, []);
+}
+
+export async function updateProjectPerson(projectId: string, personId: string, input: UpdateProjectPersonInput): Promise<ProjectPerson[]> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return createMockPeople().map((person) => person.id === personId ? { ...person, ...input } : person).filter((person) => !person.isHidden);
+  }
+
+  return invokeOrMock<ProjectPerson[]>("update_project_person", { projectId, personId, input }, []);
+}
+
+export async function mergeProjectPeople(projectId: string, primaryPersonId: string, secondaryPersonId: string): Promise<ProjectPerson[]> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return createMockPeople().filter((person) => person.id !== secondaryPersonId).map((person) => person.id === primaryPersonId ? { ...person, faceCount: person.faceCount + 1 } : person);
+  }
+
+  return invokeOrMock<ProjectPerson[]>("merge_project_people", { projectId, input: { primaryPersonId, secondaryPersonId } }, []);
+}
+
+export async function splitProjectPersonFace(projectId: string, faceDetectionId: string, displayName?: string): Promise<ProjectPerson[]> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    void faceDetectionId;
+    void displayName;
+    return createMockPeople();
+  }
+
+  return invokeOrMock<ProjectPerson[]>("split_project_person_face", { projectId, input: { faceDetectionId, displayName } }, []);
+}
+
 export async function getProjectPeopleSummary(projectId: string): Promise<ProjectPeopleSummary> {
   if (!hasTauriRuntime()) {
     void projectId;
     return {
-      faceAnalysisRunCount: 0,
-      detectedFaceCount: 0,
-      clusteredPeopleCount: 0,
-      namedPeopleCount: 0,
-      priorityPeopleCount: 0,
+      faceAnalysisRunCount: 1,
+      detectedFaceCount: 6,
+      clusteredPeopleCount: 3,
+      namedPeopleCount: 3,
+      priorityPeopleCount: 1,
       unassignedFaceCount: 0,
-      photosWithFacesCount: 0,
+      photosWithFacesCount: 6,
     };
   }
 

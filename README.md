@@ -8,29 +8,29 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current full product progress: 56%
-Current active phase progress: 20% (Phase 3)
+Current full product progress: 65%
+Current active phase progress: 100% (Phase 3)
 
 Phase 1 status: 100% complete, including native Rust/Tauri compile and macOS app bundle validation.
 Phase 2 status: 100% complete, with technical-quality scoring, connected-component duplicate grouping, burst grouping, grouping audit summaries, ranking confidence, project-wide album shortlist, review queue queries, and focused Rust tests in place.
-Phase 3 status: 20% complete, with face/people persistence schema, summary plumbing, sidecar contracts, readiness UI, and a safe people-analysis task path that records waiting-for-model runs without pretending real detections exist. Cross-cutting premium UI redesign foundation is active across the current product surfaces.
+Phase 3 status: 100% complete, with local CPU face-candidate analysis, cache-only face crops, lightweight embeddings, people clustering, people list/review UI, rename, priority, hide, merge, and split controls. This completes the Phase 3 workflow while reserving production-grade Face AI Pack accuracy for Phase 6 model distribution.
 
 Immediate repo priorities:
 
 1. Preserve the phase-based build discipline defined below.
 2. Use `docs/architecture.md` and `docs/phase-1-plan.md` as the implementation baseline.
-3. Phase 3 has started. Keep implementation focused on local people intelligence foundations before final selection.
+3. Phase 3 is complete. Continue with Phase 4 smart selection only after review.
 
 ## Progress Model
 
 Full product progress is tracked separately from phase completion.
 
-Current weighted estimate: `56%` overall.
+Current weighted estimate: `65%` overall.
 
 Basis:
 - Phase 1 foundation: `100%` complete
 - Phase 2 fast AI engine: `100%` complete
-- Phase 3 face intelligence: `20%` complete
+- Phase 3 face intelligence: `100%` complete
 - Phase 4 smart selection engine: `0%` complete
 - Phase 5 professional polish: `0%` complete
 - Phase 6 production distribution and release hardening: `8%` complete

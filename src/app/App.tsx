@@ -9,7 +9,7 @@ import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { StudioPage } from "../pages/StudioPage";
-import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, startPeopleAnalysis, startQualityAnalysis } from "../services/analysisService";
+import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, listProjectPeople, mergeProjectPeople, splitProjectPersonFace, startPeopleAnalysis, startQualityAnalysis, updateProjectPerson } from "../services/analysisService";
 import { listAlbumCandidatePhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
@@ -17,7 +17,7 @@ import { bootstrapApplication, getSystemStatus } from "../services/systemStatusS
 import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
-import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto } from "../types/project";
+import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson, ProjectPhoto } from "../types/project";
 import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
@@ -34,6 +34,7 @@ export function App() {
   const [groupSummaries, setGroupSummaries] = useState<CurationGroupSummary[]>([]);
   const [analysisSummary, setAnalysisSummary] = useState<ProjectAnalysisSummary | undefined>();
   const [peopleSummary, setPeopleSummary] = useState<ProjectPeopleSummary | undefined>();
+  const [people, setPeople] = useState<ProjectPerson[]>([]);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
   const [hasMorePhotos, setHasMorePhotos] = useState(false);
@@ -108,6 +109,7 @@ export function App() {
       setGroupSummaries([]);
       setAnalysisSummary(undefined);
       setPeopleSummary(undefined);
+      setPeople([]);
       setIsLoadingMorePhotos(false);
       setHasMorePhotos(false);
       setPhotoError(undefined);
@@ -126,8 +128,9 @@ export function App() {
       listProjectGroupSummaries(currentProject.projectId),
       getProjectAnalysisSummary(currentProject.projectId),
       getProjectPeopleSummary(currentProject.projectId),
+      listProjectPeople(currentProject.projectId),
     ])
-      .then(([photos, shortlist, reviewItems, groups, summary, people]) => {
+      .then(([photos, shortlist, reviewItems, groups, summary, peopleSummary, projectPeople]) => {
         if (cancelled) {
           return;
         }
@@ -136,7 +139,8 @@ export function App() {
         setReviewQueue(reviewItems);
         setGroupSummaries(groups);
         setAnalysisSummary(summary);
-        setPeopleSummary(people);
+        setPeopleSummary(peopleSummary);
+        setPeople(projectPeople);
         setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
       })
       .catch((error) => {
@@ -178,13 +182,14 @@ export function App() {
           }
           setProjects(refreshedProjects);
           openProject(nextTask.projectId);
-          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary] = await Promise.all([
+          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary, refreshedPeople] = await Promise.all([
             listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
             listAlbumCandidatePhotos(nextTask.projectId),
             listReviewQueuePhotos(nextTask.projectId),
             listProjectGroupSummaries(nextTask.projectId),
             getProjectAnalysisSummary(nextTask.projectId),
             getProjectPeopleSummary(nextTask.projectId),
+            listProjectPeople(nextTask.projectId),
           ]);
           if (cancelled) {
             return;
@@ -195,6 +200,7 @@ export function App() {
           setGroupSummaries(refreshedGroupSummaries);
           setAnalysisSummary(refreshedSummary);
           setPeopleSummary(refreshedPeopleSummary);
+          setPeople(refreshedPeople);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
             id: crypto.randomUUID(),
@@ -245,13 +251,14 @@ export function App() {
         setActiveAnalysisTask(nextTask);
 
         if (isTerminal(nextTask)) {
-          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary] = await Promise.all([
+          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary, refreshedPeople] = await Promise.all([
             listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
             listAlbumCandidatePhotos(nextTask.projectId),
             listReviewQueuePhotos(nextTask.projectId),
             listProjectGroupSummaries(nextTask.projectId),
             getProjectAnalysisSummary(nextTask.projectId),
             getProjectPeopleSummary(nextTask.projectId),
+            listProjectPeople(nextTask.projectId),
           ]);
           if (cancelled) {
             return;
@@ -262,6 +269,7 @@ export function App() {
           setGroupSummaries(refreshedGroupSummaries);
           setAnalysisSummary(refreshedSummary);
           setPeopleSummary(refreshedPeopleSummary);
+          setPeople(refreshedPeople);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
             id: crypto.randomUUID(),
@@ -329,9 +337,13 @@ export function App() {
         }
         setActivePeopleTask(nextTask);
         if (isTerminal(nextTask)) {
-          const people = await getProjectPeopleSummary(nextTask.projectId);
+          const [peopleSummary, projectPeople] = await Promise.all([
+            getProjectPeopleSummary(nextTask.projectId),
+            listProjectPeople(nextTask.projectId),
+          ]);
           if (!cancelled) {
-            setPeopleSummary(people);
+            setPeopleSummary(peopleSummary);
+            setPeople(projectPeople);
             addActivity({
               id: crypto.randomUUID(),
               eventType: nextTask.status === "error" ? "people_analysis_failed" : "people_analysis_prepared",
@@ -351,6 +363,7 @@ export function App() {
             progressTotal: activePeopleTask.progressTotal,
             message: error instanceof Error ? error.message : "People preparation failed.",
             processedPhotoCount: activePeopleTask.processedPhotoCount,
+            failedCount: activePeopleTask.failedCount,
             detectedFaceCount: activePeopleTask.detectedFaceCount,
             clusteredPeopleCount: activePeopleTask.clusteredPeopleCount,
             modelStatus: activePeopleTask.modelStatus,
@@ -403,13 +416,14 @@ export function App() {
         const refreshedProjects = await listProjects();
         setProjects(refreshedProjects);
         openProject(currentProject.projectId);
-        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary] = await Promise.all([
+        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary, refreshedPeople] = await Promise.all([
           listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
           listAlbumCandidatePhotos(currentProject.projectId),
           listReviewQueuePhotos(currentProject.projectId),
           listProjectGroupSummaries(currentProject.projectId),
           getProjectAnalysisSummary(currentProject.projectId),
           getProjectPeopleSummary(currentProject.projectId),
+          listProjectPeople(currentProject.projectId),
         ]);
         setProjectPhotos(refreshedPhotos);
         setAlbumCandidates(refreshedAlbumCandidates);
@@ -417,6 +431,7 @@ export function App() {
         setGroupSummaries(refreshedGroupSummaries);
         setAnalysisSummary(refreshedSummary);
         setPeopleSummary(refreshedPeopleSummary);
+        setPeople(refreshedPeople);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
           id: crypto.randomUUID(),
@@ -466,13 +481,14 @@ export function App() {
       });
 
       if (isTerminal(task)) {
-        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary] = await Promise.all([
+        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedGroupSummaries, refreshedSummary, refreshedPeopleSummary, refreshedPeople] = await Promise.all([
           listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
           listAlbumCandidatePhotos(currentProject.projectId),
           listReviewQueuePhotos(currentProject.projectId),
           listProjectGroupSummaries(currentProject.projectId),
           getProjectAnalysisSummary(currentProject.projectId),
           getProjectPeopleSummary(currentProject.projectId),
+          listProjectPeople(currentProject.projectId),
         ]);
         setProjectPhotos(refreshedPhotos);
         setAlbumCandidates(refreshedAlbumCandidates);
@@ -480,6 +496,7 @@ export function App() {
         setGroupSummaries(refreshedGroupSummaries);
         setAnalysisSummary(refreshedSummary);
         setPeopleSummary(refreshedPeopleSummary);
+        setPeople(refreshedPeople);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
           id: crypto.randomUUID(),
@@ -565,8 +582,12 @@ export function App() {
       });
 
       if (isTerminal(task)) {
-        const people = await getProjectPeopleSummary(currentProject.projectId);
-        setPeopleSummary(people);
+        const [peopleSummary, projectPeople] = await Promise.all([
+          getProjectPeopleSummary(currentProject.projectId),
+          listProjectPeople(currentProject.projectId),
+        ]);
+        setPeopleSummary(peopleSummary);
+        setPeople(projectPeople);
       }
     } catch (error) {
       const task: PeopleAnalysisTask = {
@@ -577,12 +598,44 @@ export function App() {
         progressTotal: 0,
         message: error instanceof Error ? error.message : "People preparation failed.",
         processedPhotoCount: 0,
+        failedCount: 0,
         detectedFaceCount: 0,
         clusteredPeopleCount: 0,
         modelStatus: "error",
       };
       setActivePeopleTask(task);
     }
+  }
+
+
+  async function handleUpdatePerson(personId: string, input: { displayName?: string; priorityLabel?: string; isHidden?: boolean }) {
+    if (!currentProject) {
+      return;
+    }
+    const nextPeople = await updateProjectPerson(currentProject.projectId, personId, input);
+    const nextSummary = await getProjectPeopleSummary(currentProject.projectId);
+    setPeople(nextPeople);
+    setPeopleSummary(nextSummary);
+  }
+
+  async function handleMergePeople(primaryPersonId: string, secondaryPersonId: string) {
+    if (!currentProject || !secondaryPersonId || primaryPersonId === secondaryPersonId) {
+      return;
+    }
+    const nextPeople = await mergeProjectPeople(currentProject.projectId, primaryPersonId, secondaryPersonId);
+    const nextSummary = await getProjectPeopleSummary(currentProject.projectId);
+    setPeople(nextPeople);
+    setPeopleSummary(nextSummary);
+  }
+
+  async function handleSplitPersonFace(faceDetectionId: string) {
+    if (!currentProject) {
+      return;
+    }
+    const nextPeople = await splitProjectPersonFace(currentProject.projectId, faceDetectionId, "New person");
+    const nextSummary = await getProjectPeopleSummary(currentProject.projectId);
+    setPeople(nextPeople);
+    setPeopleSummary(nextSummary);
   }
 
   async function handlePauseScan() {
@@ -735,7 +788,7 @@ export function App() {
       />
     );
   } else if (currentView === "people") {
-    content = <StudioPage mode="people" title="People" subtitle="Recognize familiar faces and protect important memories." project={currentProject} photos={projectPhotos} peopleSummary={peopleSummary} peopleTask={activePeopleTask} onStartPeopleAnalysis={handleStartPeopleAnalysis} />;
+    content = <StudioPage mode="people" title="People" subtitle="Recognize familiar faces and protect important memories." project={currentProject} photos={projectPhotos} peopleSummary={peopleSummary} people={people} peopleTask={activePeopleTask} onStartPeopleAnalysis={handleStartPeopleAnalysis} onUpdatePerson={handleUpdatePerson} onMergePeople={handleMergePeople} onSplitPersonFace={handleSplitPersonFace} />;
   } else if (currentView === "places") {
     content = <StudioPage mode="places" title="Places" subtitle="Memories arranged by where they happened." project={currentProject} photos={projectPhotos} />;
   } else if (currentView === "timeline") {

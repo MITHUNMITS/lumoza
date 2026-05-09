@@ -4,7 +4,7 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use crate::{
-    services::{database, quality_analyzer},
+    services::{database, people_analyzer, quality_analyzer},
     state::app_state::{
         AppState, PeopleAnalysisTaskSnapshot, QualityAnalysisTaskSnapshot, ScanTaskControl,
     },
@@ -258,16 +258,19 @@ pub fn start_people_analysis(
         message: if photos.is_empty() {
             "No memories are indexed yet.".into()
         } else {
-            format!(
-                "Preparing people intelligence for {} memories...",
-                photos.len()
-            )
+            format!("Finding familiar faces across {} memories...", photos.len())
         },
         processed_photo_count: 0,
+        failed_count: 0,
         detected_face_count: 0,
         clustered_people_count: 0,
-        model_status: "face_ai_pack_missing".into(),
+        model_status: "local_cpu_candidate".into(),
     };
+
+    let crop_cache_root = Path::new(&project.thumbnail_cache_path)
+        .parent()
+        .map(|path| path.join("faces"))
+        .unwrap_or_else(|| Path::new(&project.thumbnail_cache_path).join("faces"));
 
     runtime.insert_people_task(task.clone());
     runtime.bind_project_people_task(project_id, task.id.clone());
@@ -279,7 +282,8 @@ pub fn start_people_analysis(
             runtime_clone,
             task_id,
             project.project_db_path,
-            photos.len() as u64,
+            crop_cache_root.to_string_lossy().to_string(),
+            photos,
         );
     });
 
@@ -298,26 +302,48 @@ fn run_people_analysis_task(
     runtime: crate::state::app_state::AppRuntime,
     task_id: String,
     project_db_path: String,
-    photo_count: u64,
+    crop_cache_root: String,
+    photos: Vec<database::AnalysisPhotoRecord>,
 ) {
-    let analysis_run_id = Uuid::new_v4().to_string();
-    let _ = runtime.update_people_task(&task_id, |task| {
-        task.progress_current = photo_count;
-        task.processed_photo_count = photo_count;
-        task.message = "People workspace prepared. Face AI pack is not installed yet.".into();
-    });
+    if photos.is_empty() {
+        let _ = runtime.update_people_task(&task_id, |task| {
+            task.status = "completed".into();
+            task.message =
+                "People analysis skipped because no indexed photos are available yet.".into();
+        });
+        return;
+    }
 
-    let message = "People workspace prepared. Face AI pack is not installed yet, so no face detections were written.";
-    let persist_result = database::persist_face_analysis_run(
+    let analysis_run_id = Uuid::new_v4().to_string();
+    let photo_count = photos.len() as u64;
+    let mut progress = |processed: u64, failed_count: u64, detected_count: u64| {
+        let _ = runtime.update_people_task(&task_id, |task| {
+            task.status = "running".into();
+            task.progress_current = processed;
+            task.processed_photo_count = processed.saturating_sub(failed_count);
+            task.failed_count = failed_count;
+            task.detected_face_count = detected_count;
+            task.model_status = "local_cpu_candidate".into();
+            task.message = format!(
+                "Scanned {} of {} memories and found {} face candidates.",
+                processed, task.progress_total, detected_count,
+            );
+        });
+    };
+
+    let result =
+        people_analyzer::analyze_people(&photos, Path::new(&crop_cache_root), &mut progress);
+    let failed_count = result.failed_photo_ids.len() as u64;
+    let processed_count = photo_count.saturating_sub(failed_count);
+    let detected_face_count = result.detections.len() as u64;
+    let clustered_people_count = result.clusters.len() as u64;
+
+    let persist_result = database::persist_people_analysis(
         Path::new(&project_db_path),
         &analysis_run_id,
-        "waiting_for_model",
-        "phase-3-face-contract",
         photo_count,
-        photo_count,
-        0,
-        0,
-        message,
+        &result,
+        false,
     );
 
     match persist_result {
@@ -326,17 +352,23 @@ fn run_people_analysis_task(
                 task.status = "completed".into();
                 task.progress_current = photo_count;
                 task.progress_total = photo_count;
-                task.processed_photo_count = photo_count;
-                task.detected_face_count = 0;
-                task.clustered_people_count = 0;
-                task.model_status = "face_ai_pack_missing".into();
-                task.message = message.into();
+                task.processed_photo_count = processed_count;
+                task.failed_count = failed_count;
+                task.detected_face_count = detected_face_count;
+                task.clustered_people_count = clustered_people_count;
+                task.model_status = "local_cpu_candidate".into();
+                task.message = format!(
+                    "People analysis complete: {} face candidates organized into {} people groups, with {} unreadable files.",
+                    detected_face_count,
+                    clustered_people_count,
+                    failed_count,
+                );
             });
         }
         Err(error) => {
             let _ = runtime.update_people_task(&task_id, |task| {
                 task.status = "error".into();
-                task.message = format!("People preparation failed: {error}");
+                task.message = format!("People analysis failed: {error}");
             });
         }
     }

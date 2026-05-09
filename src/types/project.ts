@@ -34,6 +34,32 @@ export interface ProjectPeopleSummary {
   photosWithFacesCount: number;
 }
 
+export interface ProjectPersonFace {
+  id: string;
+  photoId: string;
+  filename?: string;
+  cropCachePath?: string;
+  boundingBoxX: number;
+  boundingBoxY: number;
+  boundingBoxWidth: number;
+  boundingBoxHeight: number;
+  detectionConfidence: number;
+  qualityScore: number;
+  isRepresentative: boolean;
+}
+
+export interface ProjectPerson {
+  id: string;
+  displayName?: string;
+  representativeFaceId?: string;
+  representativeCropCachePath?: string;
+  faceCount: number;
+  photoCount: number;
+  priorityLabel: string;
+  isHidden: boolean;
+  faces: ProjectPersonFace[];
+}
+
 export interface ProjectPhotoQualitySummary {
   sharpnessScore?: number;
   exposureScore?: number;

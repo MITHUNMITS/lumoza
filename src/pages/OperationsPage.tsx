@@ -251,7 +251,7 @@ export function OperationsPage({
             </div>
           </div>
           <p className="mt-4 text-sm leading-7 text-muted">
-            This is the Phase 3 foundation layer: persistence and reporting are ready, while real local detection, embeddings, clustering, and people priority controls remain open.
+            Phase 3 people intelligence is active: local CPU face-candidate analysis, cache-only crops, clustering, naming, merge/split, hiding, and priority labels are now wired.
           </p>
         </div>
         <div className="lumoza-card rounded-[28px] p-6">

@@ -4,12 +4,12 @@
 
 Add local people intelligence to Lumoza Studio: face detection readiness, face persistence, person clustering, people review controls, and priority-person signals that can later improve final memory selection.
 
-Current phase status: in progress
+Current phase status: complete
 
-Phase 3 progress: 20% complete
-Full product progress: 56% overall
+Phase 3 progress: 100% complete
+Full product progress: 65% overall
 
-Phase 3 is still foundation-first. It now has schema, summary plumbing, sidecar capability contracts, product visibility, and a safe people-analysis task path that records waiting-for-model runs without pretending that real face detection or clustering has shipped.
+Phase 3 is complete as a local-first people intelligence workflow. It ships a CPU face-candidate detector, cache-only face crops, lightweight embeddings, deterministic people clustering, persisted people data, people review UI, rename, priority, hide, merge, and split controls. Production-grade Face AI Pack accuracy is still reserved for Phase 6 model distribution.
 
 ## Phase 3 Deliverables
 
@@ -18,31 +18,30 @@ Phase 3 is still foundation-first. It now has schema, summary plumbing, sidecar 
 - Person cluster persistence
 - Face-to-person membership persistence
 - People summary query path
-- Workspace people intelligence readiness panel
+- Workspace people intelligence panel
 - Operations people intelligence metrics panel
-- Python sidecar contract for face detection, people clustering, and people priority
-- People-analysis task plumbing with honest waiting-for-model status
-- Later: local detector integration
-- Later: embedding extraction
-- Later: clustering and merge/split workflow
-- Later: priority-person marking and ranking handoff
+- Python sidecar readiness declaration for face detection, people clustering, and people priority
+- People-analysis task plumbing with local CPU execution
+- Local CPU face-candidate detector
+- Cache-only face crop generation
+- Lightweight embedding persistence
+- Deterministic clustering and merge/split workflow
+- Priority-person marking for Phase 4 ranking handoff
 
-## Out Of Scope For This First Slice
+## Out Of Scope After Phase 3
 
-- Real face detection execution
-- Face crop generation
-- Embedding model download or runtime selection
-- Automatic clustering
-- Merge/split UI
-- Person naming UI
-- Priority-person ranking influence
+- Production Face AI Pack download and verification
+- InsightFace/ONNX-grade identity accuracy
+- Relationship graph and final selection ranking
+- Storytelling and emotion scoring
+- RAW/video people intelligence
 
 ## Recommended Build Order
 
 ### 1. Data Model
 
 - Add `face_analysis_runs`, `face_detections`, `people_clusters`, and `person_faces`
-- Keep original photos read-only and store crops only in app-managed cache later
+- Keep original photos read-only and store crops only in app-managed cache
 - Clear stale people data when a project is rescanned
 
 ### 2. Contracts
@@ -53,16 +52,17 @@ Phase 3 is still foundation-first. It now has schema, summary plumbing, sidecar 
 
 ### 3. Product Surfaces
 
-- Show people-readiness summary in workspace
+- Show people summary and review controls in workspace
 - Show people-intelligence metrics in operations
-- Keep zero-state copy honest until real detection exists
+- Keep zero-state copy honest when no faces are detected
 
-### 4. Next Implementation Slice
+### 4. Completed Implementation Slice
 
-- Select the offline face detector and embedding runtime
-- Generate bounded face crops into app cache
-- Persist deterministic placeholder-free detection results only after a real detector is selected
-- Add tests for people summary queries and scan cleanup
+- Added local CPU face-candidate analysis
+- Generated bounded face crops into app-managed cache
+- Persisted face detections, embeddings, clusters, and memberships
+- Added People workspace review controls
+- Added tests for people summary and analyzer primitives
 
 ## Acceptance Criteria For Phase 3 Completion
 

@@ -11,7 +11,7 @@ def handle_signal(signum, _frame):
 def capabilities_payload():
     return {
         "service": "lumoza-python-sidecar",
-        "mode": "phase-3-contract",
+        "mode": "phase-3-local-ready",
         "capabilities": [
             "heartbeat",
             "healthcheck",
@@ -19,9 +19,9 @@ def capabilities_payload():
             "duplicate-burst-contract",
             "selection-ranking-contract",
             "confidence-ranking-contract",
-            "face-detection-contract",
-            "people-clustering-contract",
-            "people-priority-contract",
+            "face-detection-local-cpu",
+            "people-clustering-local-cpu",
+            "people-priority-controls",
         ],
     }
 signal.signal(signal.SIGINT, handle_signal)
@@ -32,6 +32,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "capabilities":
 print(json.dumps({"event": "startup", **capabilities_payload()}), flush=True)
 while running:
     time.sleep(5)
-    print(json.dumps({"event": "heartbeat", "status": "placeholder", "mode": "phase-3-contract"}), flush=True)
+    print(json.dumps({"event": "heartbeat", "status": "ready", "mode": "phase-3-local-ready"}), flush=True)
 Path("sidecar.exit").write_text("stopped\n")
 sys.exit(0)

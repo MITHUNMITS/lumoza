@@ -5,7 +5,7 @@ print(
         {
             "status": "ok",
             "service": "lumoza-python-sidecar",
-            "mode": "phase-3-contract",
+            "mode": "phase-3-local-ready",
             "capabilities": [
                 "heartbeat",
                 "healthcheck",
@@ -13,9 +13,9 @@ print(
                 "duplicate-burst-contract",
                 "selection-ranking-contract",
                 "confidence-ranking-contract",
-                "face-detection-contract",
-                "people-clustering-contract",
-                "people-priority-contract",
+                "face-detection-local-cpu",
+                "people-clustering-local-cpu",
+                "people-priority-controls",
             ],
         }
     )

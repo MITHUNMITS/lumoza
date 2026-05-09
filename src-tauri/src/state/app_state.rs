@@ -63,6 +63,7 @@ pub struct PeopleAnalysisTaskSnapshot {
     pub progress_total: u64,
     pub message: String,
     pub processed_photo_count: u64,
+    pub failed_count: u64,
     pub detected_face_count: u64,
     pub clustered_people_count: u64,
     pub model_status: String,

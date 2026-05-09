@@ -93,6 +93,88 @@ pub struct ProjectPeopleSummaryResponse {
     pub photos_with_faces_count: u64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPersonFaceResponse {
+    pub id: String,
+    pub photo_id: String,
+    pub filename: Option<String>,
+    pub crop_cache_path: Option<String>,
+    pub bounding_box_x: f64,
+    pub bounding_box_y: f64,
+    pub bounding_box_width: f64,
+    pub bounding_box_height: f64,
+    pub detection_confidence: f64,
+    pub quality_score: f64,
+    pub is_representative: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPersonResponse {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub representative_face_id: Option<String>,
+    pub representative_crop_cache_path: Option<String>,
+    pub face_count: u64,
+    pub photo_count: u64,
+    pub priority_label: String,
+    pub is_hidden: bool,
+    pub faces: Vec<ProjectPersonFaceResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectPersonInput {
+    pub display_name: Option<String>,
+    pub priority_label: Option<String>,
+    pub is_hidden: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeProjectPeopleInput {
+    pub primary_person_id: String,
+    pub secondary_person_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitProjectPersonFaceInput {
+    pub face_detection_id: String,
+    pub display_name: Option<String>,
+}
+
+fn map_project_person_response(person: database::ProjectPersonRecord) -> ProjectPersonResponse {
+    ProjectPersonResponse {
+        id: person.id,
+        display_name: person.display_name,
+        representative_face_id: person.representative_face_id,
+        representative_crop_cache_path: person.representative_crop_cache_path,
+        face_count: person.face_count,
+        photo_count: person.photo_count,
+        priority_label: person.priority_label,
+        is_hidden: person.is_hidden,
+        faces: person
+            .faces
+            .into_iter()
+            .map(|face| ProjectPersonFaceResponse {
+                id: face.id,
+                photo_id: face.photo_id,
+                filename: face.filename,
+                crop_cache_path: face.crop_cache_path,
+                bounding_box_x: face.bounding_box_x,
+                bounding_box_y: face.bounding_box_y,
+                bounding_box_width: face.bounding_box_width,
+                bounding_box_height: face.bounding_box_height,
+                detection_confidence: face.detection_confidence,
+                quality_score: face.quality_score,
+                is_representative: face.is_representative,
+            })
+            .collect(),
+    }
+}
+
 fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPhotoResponse {
     ProjectPhotoResponse {
         id: photo.id,
@@ -304,4 +386,103 @@ pub fn initialize_project_database(project_db_path: String) -> Result<bool, Stri
     database::initialize_project_database(PathBuf::from(project_db_path).as_path())
         .map(|_| true)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_project_people(
+    app: AppHandle,
+    project_id: String,
+) -> Result<Vec<ProjectPersonResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let people = database::list_project_people(PathBuf::from(&project.project_db_path).as_path())
+        .map_err(|error| error.to_string())?;
+
+    Ok(people
+        .into_iter()
+        .map(map_project_person_response)
+        .collect())
+}
+
+#[tauri::command]
+pub fn update_project_person(
+    app: AppHandle,
+    project_id: String,
+    person_id: String,
+    input: UpdateProjectPersonInput,
+) -> Result<Vec<ProjectPersonResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+    let db_path = PathBuf::from(&project.project_db_path);
+
+    database::update_project_person(
+        db_path.as_path(),
+        &person_id,
+        input.display_name,
+        input.priority_label,
+        input.is_hidden,
+    )
+    .map_err(|error| error.to_string())?;
+
+    let people =
+        database::list_project_people(db_path.as_path()).map_err(|error| error.to_string())?;
+    Ok(people
+        .into_iter()
+        .map(map_project_person_response)
+        .collect())
+}
+
+#[tauri::command]
+pub fn merge_project_people(
+    app: AppHandle,
+    project_id: String,
+    input: MergeProjectPeopleInput,
+) -> Result<Vec<ProjectPersonResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+    let db_path = PathBuf::from(&project.project_db_path);
+
+    database::merge_project_people(
+        db_path.as_path(),
+        &input.primary_person_id,
+        &input.secondary_person_id,
+    )
+    .map_err(|error| error.to_string())?;
+
+    let people =
+        database::list_project_people(db_path.as_path()).map_err(|error| error.to_string())?;
+    Ok(people
+        .into_iter()
+        .map(map_project_person_response)
+        .collect())
+}
+
+#[tauri::command]
+pub fn split_project_person_face(
+    app: AppHandle,
+    project_id: String,
+    input: SplitProjectPersonFaceInput,
+) -> Result<Vec<ProjectPersonResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+    let db_path = PathBuf::from(&project.project_db_path);
+
+    database::split_project_person_face(
+        db_path.as_path(),
+        &input.face_detection_id,
+        input.display_name,
+    )
+    .map_err(|error| error.to_string())?;
+
+    let people =
+        database::list_project_people(db_path.as_path()).map_err(|error| error.to_string())?;
+    Ok(people
+        .into_iter()
+        .map(map_project_person_response)
+        .collect())
 }
