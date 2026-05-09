@@ -595,6 +595,59 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
     })
 }
 
+pub fn persist_face_analysis_run(
+    path: &Path,
+    analysis_run_id: &str,
+    status: &str,
+    engine: &str,
+    photos_total: u64,
+    photos_processed: u64,
+    faces_detected: u64,
+    people_clustered: u64,
+    message: &str,
+) -> anyhow::Result<()> {
+    let mut connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let transaction = connection.transaction()?;
+    let now = Utc::now().to_rfc3339();
+
+    transaction.execute(
+        "INSERT INTO face_analysis_runs (id, status, engine, engine_version, photos_total, photos_processed, faces_detected, people_clustered, started_at, ended_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+            analysis_run_id,
+            status,
+            engine,
+            env!("CARGO_PKG_VERSION"),
+            photos_total as i64,
+            photos_processed as i64,
+            faces_detected as i64,
+            people_clustered as i64,
+            now.as_str(),
+            now.as_str(),
+        ],
+    )?;
+
+    transaction.execute(
+        "INSERT INTO activity_log (id, event_type, severity, message, payload_json, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            format!("face-analysis-run-{analysis_run_id}"),
+            "people_analysis_prepared",
+            "info",
+            message,
+            format!(
+                r#"{{"photosTotal": {}, "photosProcessed": {}, "facesDetected": {}, "peopleClustered": {}}}"#,
+                photos_total, photos_processed, faces_detected, people_clustered
+            ),
+            now.as_str(),
+        ],
+    )?;
+
+    transaction.commit()?;
+    Ok(())
+}
+
 pub fn get_project_people_summary(path: &Path) -> anyhow::Result<ProjectPeopleSummaryRecord> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;

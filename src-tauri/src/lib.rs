@@ -18,6 +18,8 @@ pub fn run() {
             commands::app::bootstrap_app,
             commands::analysis::start_quality_analysis,
             commands::analysis::get_quality_analysis_task,
+            commands::analysis::start_people_analysis,
+            commands::analysis::get_people_analysis_task,
             commands::project::list_projects,
             commands::project::create_project,
             commands::project::list_project_photos,

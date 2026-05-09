@@ -46,3 +46,17 @@ export interface ActivityItem {
   message: string;
   createdAt: string;
 }
+
+
+export interface PeopleAnalysisTask {
+  id: string;
+  projectId: string;
+  status: ScanTaskStatus;
+  progressCurrent: number;
+  progressTotal: number;
+  message: string;
+  processedPhotoCount: number;
+  detectedFaceCount: number;
+  clusteredPeopleCount: number;
+  modelStatus: string;
+}

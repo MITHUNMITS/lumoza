@@ -5,10 +5,13 @@ use uuid::Uuid;
 
 use crate::{
     services::{database, quality_analyzer},
-    state::app_state::{AppState, QualityAnalysisTaskSnapshot, ScanTaskControl},
+    state::app_state::{
+        AppState, PeopleAnalysisTaskSnapshot, QualityAnalysisTaskSnapshot, ScanTaskControl,
+    },
 };
 
 pub type QualityAnalysisTaskResponse = QualityAnalysisTaskSnapshot;
+pub type PeopleAnalysisTaskResponse = PeopleAnalysisTaskSnapshot;
 
 #[tauri::command]
 pub fn start_quality_analysis(
@@ -223,4 +226,118 @@ fn run_quality_analysis_task(
     }
 
     runtime.clear_quality_control(&task_id);
+}
+
+#[tauri::command]
+pub fn start_people_analysis(
+    app: AppHandle,
+    state: State<AppState>,
+    project_id: String,
+) -> Result<PeopleAnalysisTaskResponse, String> {
+    let runtime = state.runtime();
+
+    if let Some(existing) = runtime.get_project_people_task(&project_id) {
+        if !existing.is_terminal() {
+            return Ok(existing);
+        }
+    }
+
+    let project = crate::services::project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let photos = database::list_analysis_photo_records(Path::new(&project.project_db_path))
+        .map_err(|error| error.to_string())?;
+
+    let task = PeopleAnalysisTaskSnapshot {
+        id: Uuid::new_v4().to_string(),
+        project_id: project_id.clone(),
+        status: "running".into(),
+        progress_current: 0,
+        progress_total: photos.len() as u64,
+        message: if photos.is_empty() {
+            "No memories are indexed yet.".into()
+        } else {
+            format!(
+                "Preparing people intelligence for {} memories...",
+                photos.len()
+            )
+        },
+        processed_photo_count: 0,
+        detected_face_count: 0,
+        clustered_people_count: 0,
+        model_status: "face_ai_pack_missing".into(),
+    };
+
+    runtime.insert_people_task(task.clone());
+    runtime.bind_project_people_task(project_id, task.id.clone());
+
+    let runtime_clone = runtime.clone();
+    let task_id = task.id.clone();
+    thread::spawn(move || {
+        run_people_analysis_task(
+            runtime_clone,
+            task_id,
+            project.project_db_path,
+            photos.len() as u64,
+        );
+    });
+
+    Ok(task)
+}
+
+#[tauri::command]
+pub fn get_people_analysis_task(
+    state: State<AppState>,
+    task_id: String,
+) -> Option<PeopleAnalysisTaskResponse> {
+    state.runtime().get_people_task(&task_id)
+}
+
+fn run_people_analysis_task(
+    runtime: crate::state::app_state::AppRuntime,
+    task_id: String,
+    project_db_path: String,
+    photo_count: u64,
+) {
+    let analysis_run_id = Uuid::new_v4().to_string();
+    let _ = runtime.update_people_task(&task_id, |task| {
+        task.progress_current = photo_count;
+        task.processed_photo_count = photo_count;
+        task.message = "People workspace prepared. Face AI pack is not installed yet.".into();
+    });
+
+    let message = "People workspace prepared. Face AI pack is not installed yet, so no face detections were written.";
+    let persist_result = database::persist_face_analysis_run(
+        Path::new(&project_db_path),
+        &analysis_run_id,
+        "waiting_for_model",
+        "phase-3-face-contract",
+        photo_count,
+        photo_count,
+        0,
+        0,
+        message,
+    );
+
+    match persist_result {
+        Ok(()) => {
+            let _ = runtime.update_people_task(&task_id, |task| {
+                task.status = "completed".into();
+                task.progress_current = photo_count;
+                task.progress_total = photo_count;
+                task.processed_photo_count = photo_count;
+                task.detected_face_count = 0;
+                task.clustered_people_count = 0;
+                task.model_status = "face_ai_pack_missing".into();
+                task.message = message.into();
+            });
+        }
+        Err(error) => {
+            let _ = runtime.update_people_task(&task_id, |task| {
+                task.status = "error".into();
+                task.message = format!("People preparation failed: {error}");
+            });
+        }
+    }
 }

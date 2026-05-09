@@ -53,6 +53,27 @@ impl QualityAnalysisTaskSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeopleAnalysisTaskSnapshot {
+    pub id: String,
+    pub project_id: String,
+    pub status: String,
+    pub progress_current: u64,
+    pub progress_total: u64,
+    pub message: String,
+    pub processed_photo_count: u64,
+    pub detected_face_count: u64,
+    pub clustered_people_count: u64,
+    pub model_status: String,
+}
+
+impl PeopleAnalysisTaskSnapshot {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.status.as_str(), "completed" | "cancelled" | "error")
+    }
+}
+
 #[derive(Default)]
 struct ControlFlags {
     paused: bool,
@@ -120,6 +141,8 @@ pub struct AppRuntime {
     quality_tasks: Arc<Mutex<HashMap<String, QualityAnalysisTaskSnapshot>>>,
     project_quality_tasks: Arc<Mutex<HashMap<String, String>>>,
     quality_controls: Arc<Mutex<HashMap<String, Arc<ScanTaskControl>>>>,
+    people_tasks: Arc<Mutex<HashMap<String, PeopleAnalysisTaskSnapshot>>>,
+    project_people_tasks: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl AppRuntime {
@@ -237,6 +260,48 @@ impl AppRuntime {
         }
     }
 
+    pub fn insert_people_task(&self, task: PeopleAnalysisTaskSnapshot) {
+        if let Ok(mut tasks) = self.people_tasks.lock() {
+            tasks.insert(task.id.clone(), task);
+        }
+    }
+
+    pub fn bind_project_people_task(&self, project_id: String, task_id: String) {
+        if let Ok(mut project_tasks) = self.project_people_tasks.lock() {
+            project_tasks.insert(project_id, task_id);
+        }
+    }
+
+    pub fn get_people_task(&self, task_id: &str) -> Option<PeopleAnalysisTaskSnapshot> {
+        self.people_tasks
+            .lock()
+            .ok()
+            .and_then(|tasks| tasks.get(task_id).cloned())
+    }
+
+    pub fn get_project_people_task(&self, project_id: &str) -> Option<PeopleAnalysisTaskSnapshot> {
+        let task_id = self
+            .project_people_tasks
+            .lock()
+            .ok()
+            .and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
+        self.get_people_task(&task_id)
+    }
+
+    pub fn update_people_task<F>(
+        &self,
+        task_id: &str,
+        mutate: F,
+    ) -> Option<PeopleAnalysisTaskSnapshot>
+    where
+        F: FnOnce(&mut PeopleAnalysisTaskSnapshot),
+    {
+        let mut tasks = self.people_tasks.lock().ok()?;
+        let task = tasks.get_mut(task_id)?;
+        mutate(task);
+        Some(task.clone())
+    }
+
     pub fn active_task_count(&self) -> u64 {
         let scan_active = self
             .scan_tasks
@@ -250,7 +315,13 @@ impl AppRuntime {
             .ok()
             .map(|tasks| tasks.values().filter(|task| !task.is_terminal()).count() as u64)
             .unwrap_or(0);
-        scan_active + analysis_active
+        let people_active = self
+            .people_tasks
+            .lock()
+            .ok()
+            .map(|tasks| tasks.values().filter(|task| !task.is_terminal()).count() as u64)
+            .unwrap_or(0);
+        scan_active + analysis_active + people_active
     }
 }
 

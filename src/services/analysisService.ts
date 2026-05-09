@@ -1,6 +1,6 @@
 import { invokeOrMock } from "./tauriCommands";
 import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary } from "../types/project";
-import type { QualityAnalysisTask } from "../types/system";
+import type { PeopleAnalysisTask, QualityAnalysisTask } from "../types/system";
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -49,6 +49,34 @@ export async function startQualityAnalysis(projectId: string) {
 
 export function getQualityAnalysisTask(taskId: string) {
   return invokeOrMock<QualityAnalysisTask | null>("get_quality_analysis_task", { taskId }, null);
+}
+
+
+function mockPeopleTask(projectId: string): PeopleAnalysisTask {
+  return {
+    id: crypto.randomUUID(),
+    projectId,
+    status: "completed",
+    progressCurrent: 48,
+    progressTotal: 48,
+    message: "People workspace prepared. Face AI pack is not installed yet.",
+    processedPhotoCount: 48,
+    detectedFaceCount: 0,
+    clusteredPeopleCount: 0,
+    modelStatus: "face_ai_pack_missing",
+  };
+}
+
+export async function startPeopleAnalysis(projectId: string) {
+  if (!hasTauriRuntime()) {
+    return mockPeopleTask(projectId);
+  }
+
+  return invokeOrMock<PeopleAnalysisTask>("start_people_analysis", { projectId });
+}
+
+export function getPeopleAnalysisTask(taskId: string) {
+  return invokeOrMock<PeopleAnalysisTask | null>("get_people_analysis_task", { taskId }, null);
 }
 
 export async function getProjectAnalysisSummary(projectId: string): Promise<ProjectAnalysisSummary> {

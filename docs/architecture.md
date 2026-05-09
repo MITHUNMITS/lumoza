@@ -524,6 +524,6 @@ The native analyzer computes sharpness, exposure, contrast, resolution, and over
 
 ## Phase 3 Extension Note
 
-Phase 3 has started with the people-intelligence foundation. The project database now includes face-analysis run tracking, face detections, people clusters, and face-to-person membership tables. Workspace and operations surfaces can query real persisted people-summary counts, while zero-state copy remains explicit that detection and clustering are not implemented yet.
+Phase 3 has started with the people-intelligence foundation. The project database now includes face-analysis run tracking, face detections, people clusters, and face-to-person membership tables. Workspace and operations surfaces can query real persisted people-summary counts, while zero-state copy remains explicit that detection and clustering are not implemented yet. The native task layer can now prepare a people-analysis run, persist an honest `waiting_for_model` status, and report zero detections until a local face model is selected.
 
 The Python sidecar contract now advertises face detection, people clustering, and people priority capabilities for the upcoming local AI worker. The next architectural decision is the actual detector and embedding runtime; it must remain offline-first, bounded, cache-only for derived crops, and must never mutate original photos.

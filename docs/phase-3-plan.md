@@ -6,10 +6,10 @@ Add local people intelligence to Lumoza Studio: face detection readiness, face p
 
 Current phase status: in progress
 
-Phase 3 progress: 10% complete
-Full product progress: 55% overall
+Phase 3 progress: 20% complete
+Full product progress: 56% overall
 
-This first Phase 3 slice is foundation-only. It adds schema, summary plumbing, sidecar capability contracts, and product visibility without pretending that real face detection or clustering has shipped.
+Phase 3 is still foundation-first. It now has schema, summary plumbing, sidecar capability contracts, product visibility, and a safe people-analysis task path that records waiting-for-model runs without pretending that real face detection or clustering has shipped.
 
 ## Phase 3 Deliverables
 
@@ -21,6 +21,7 @@ This first Phase 3 slice is foundation-only. It adds schema, summary plumbing, s
 - Workspace people intelligence readiness panel
 - Operations people intelligence metrics panel
 - Python sidecar contract for face detection, people clustering, and people priority
+- People-analysis task plumbing with honest waiting-for-model status
 - Later: local detector integration
 - Later: embedding extraction
 - Later: clustering and merge/split workflow
@@ -58,7 +59,7 @@ This first Phase 3 slice is foundation-only. It adds schema, summary plumbing, s
 
 ### 4. Next Implementation Slice
 
-- Add a native/Python face-analysis task model parallel to quality analysis
+- Select the offline face detector and embedding runtime
 - Generate bounded face crops into app cache
 - Persist deterministic placeholder-free detection results only after a real detector is selected
 - Add tests for people summary queries and scan cleanup

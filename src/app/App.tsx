@@ -9,7 +9,7 @@ import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { StudioPage } from "../pages/StudioPage";
-import { getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, startQualityAnalysis } from "../services/analysisService";
+import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, startPeopleAnalysis, startQualityAnalysis } from "../services/analysisService";
 import { listAlbumCandidatePhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
@@ -18,11 +18,11 @@ import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
 import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto } from "../types/project";
-import type { QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
+import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
 
-function isTerminal(task?: ScanTask | QualityAnalysisTask) {
+function isTerminal(task?: ScanTask | QualityAnalysisTask | PeopleAnalysisTask) {
   return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
 }
 
@@ -58,9 +58,11 @@ export function App() {
 
   const activeTask = useScanStore((state) => state.activeTask);
   const activeAnalysisTask = useScanStore((state) => state.activeAnalysisTask);
+  const activePeopleTask = useScanStore((state) => state.activePeopleTask);
   const activity = useScanStore((state) => state.activity);
   const setActiveTask = useScanStore((state) => state.setActiveTask);
   const setActiveAnalysisTask = useScanStore((state) => state.setActiveAnalysisTask);
+  const setActivePeopleTask = useScanStore((state) => state.setActivePeopleTask);
   const addActivity = useScanStore((state) => state.addActivity);
 
   useEffect(() => {
@@ -313,6 +315,56 @@ export function App() {
     }
   }
 
+  useEffect(() => {
+    if (!activePeopleTask || isTerminal(activePeopleTask)) {
+      return;
+    }
+
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const nextTask = await getPeopleAnalysisTask(activePeopleTask.id);
+        if (!nextTask || cancelled) {
+          return;
+        }
+        setActivePeopleTask(nextTask);
+        if (isTerminal(nextTask)) {
+          const people = await getProjectPeopleSummary(nextTask.projectId);
+          if (!cancelled) {
+            setPeopleSummary(people);
+            addActivity({
+              id: crypto.randomUUID(),
+              eventType: nextTask.status === "error" ? "people_analysis_failed" : "people_analysis_prepared",
+              severity: nextTask.status === "error" ? "error" : "info",
+              message: nextTask.message,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setActivePeopleTask({
+            id: activePeopleTask.id,
+            projectId: activePeopleTask.projectId,
+            status: "error",
+            progressCurrent: activePeopleTask.progressCurrent,
+            progressTotal: activePeopleTask.progressTotal,
+            message: error instanceof Error ? error.message : "People preparation failed.",
+            processedPhotoCount: activePeopleTask.processedPhotoCount,
+            detectedFaceCount: activePeopleTask.detectedFaceCount,
+            clusteredPeopleCount: activePeopleTask.clusteredPeopleCount,
+            modelStatus: activePeopleTask.modelStatus,
+          });
+        }
+      }
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activePeopleTask, addActivity, setActivePeopleTask]);
+
   async function handleCreateProject(input: CreateProjectInput) {
     const project = await createProject(input);
     addProject(project);
@@ -496,6 +548,43 @@ export function App() {
     }
   }
 
+  async function handleStartPeopleAnalysis() {
+    if (!currentProject) {
+      return;
+    }
+
+    try {
+      const task = await startPeopleAnalysis(currentProject.projectId);
+      setActivePeopleTask(task);
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "people_analysis_started",
+        severity: "info",
+        message: `Preparing people workspace for ${currentProject.name}.`,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (isTerminal(task)) {
+        const people = await getProjectPeopleSummary(currentProject.projectId);
+        setPeopleSummary(people);
+      }
+    } catch (error) {
+      const task: PeopleAnalysisTask = {
+        id: crypto.randomUUID(),
+        projectId: currentProject.projectId,
+        status: "error",
+        progressCurrent: 0,
+        progressTotal: 0,
+        message: error instanceof Error ? error.message : "People preparation failed.",
+        processedPhotoCount: 0,
+        detectedFaceCount: 0,
+        clusteredPeopleCount: 0,
+        modelStatus: "error",
+      };
+      setActivePeopleTask(task);
+    }
+  }
+
   async function handlePauseScan() {
     if (!currentProject || !activeTask) {
       return;
@@ -646,7 +735,7 @@ export function App() {
       />
     );
   } else if (currentView === "people") {
-    content = <StudioPage mode="people" title="People" subtitle="Recognize familiar faces and protect important memories." project={currentProject} photos={projectPhotos} />;
+    content = <StudioPage mode="people" title="People" subtitle="Recognize familiar faces and protect important memories." project={currentProject} photos={projectPhotos} peopleSummary={peopleSummary} peopleTask={activePeopleTask} onStartPeopleAnalysis={handleStartPeopleAnalysis} />;
   } else if (currentView === "places") {
     content = <StudioPage mode="places" title="Places" subtitle="Memories arranged by where they happened." project={currentProject} photos={projectPhotos} />;
   } else if (currentView === "timeline") {

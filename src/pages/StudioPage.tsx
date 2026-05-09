@@ -1,6 +1,7 @@
 import { Image, Map, SplitSquareHorizontal, Upload, UsersRound, CalendarDays, Download } from "lucide-react";
-import type { ProjectPhoto, ProjectSummary } from "../types/project";
+import type { ProjectPhoto, ProjectPeopleSummary, ProjectSummary } from "../types/project";
 import { LumozaButton } from "../components/ui/LumozaButton";
+import type { PeopleAnalysisTask } from "../types/system";
 
 interface StudioPageProps {
   title: string;
@@ -8,6 +9,9 @@ interface StudioPageProps {
   mode: "people" | "places" | "timeline" | "compare" | "import" | "export";
   project?: ProjectSummary;
   photos: ProjectPhoto[];
+  peopleSummary?: ProjectPeopleSummary;
+  peopleTask?: PeopleAnalysisTask;
+  onStartPeopleAnalysis?: () => void;
 }
 
 const icons = {
@@ -34,7 +38,7 @@ function MemoryStrip({ photos }: { photos: ProjectPhoto[] }) {
   );
 }
 
-export function StudioPage({ title, subtitle, mode, project, photos }: StudioPageProps) {
+export function StudioPage({ title, subtitle, mode, project, photos, peopleSummary, peopleTask, onStartPeopleAnalysis }: StudioPageProps) {
   const Icon = icons[mode] ?? Image;
   const isImport = mode === "import";
   const isExport = mode === "export";
@@ -81,10 +85,24 @@ export function StudioPage({ title, subtitle, mode, project, photos }: StudioPag
           <p className="text-sm text-text">{project?.name ?? "No project open"}</p>
           <p className="mt-2 text-sm text-subtle">{photos.length} memories</p>
         </div>
-        <div className="rounded-[28px] bg-white/[0.03] p-5 shadow-soft">
-          <p className="text-sm text-text">Coming next</p>
-          <p className="mt-3 text-sm leading-6 text-muted">This view is ready for the matching product phase without shipping future AI behavior early.</p>
-        </div>
+        {mode === "people" ? (
+          <div className="rounded-[28px] bg-white/[0.03] p-5 shadow-soft">
+            <p className="text-sm text-text">People readiness</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3"><p className="font-mono text-text">{peopleSummary?.faceAnalysisRunCount ?? 0}</p><p className="mt-1 text-xs text-subtle">Runs</p></div>
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3"><p className="font-mono text-text">{peopleSummary?.detectedFaceCount ?? 0}</p><p className="mt-1 text-xs text-subtle">Faces</p></div>
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3"><p className="font-mono text-text">{peopleSummary?.clusteredPeopleCount ?? 0}</p><p className="mt-1 text-xs text-subtle">People</p></div>
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3"><p className="font-mono text-text">{peopleTask?.status ?? "ready"}</p><p className="mt-1 text-xs text-subtle">Status</p></div>
+            </div>
+            {peopleTask ? <p className="mt-4 text-xs leading-5 text-muted">{peopleTask.message}</p> : null}
+            <LumozaButton type="button" variant="primary" className="mt-5 w-full" disabled={!project || peopleTask?.status === "running"} onClick={onStartPeopleAnalysis}>Prepare people</LumozaButton>
+          </div>
+        ) : (
+          <div className="rounded-[28px] bg-white/[0.03] p-5 shadow-soft">
+            <p className="text-sm text-text">Coming next</p>
+            <p className="mt-3 text-sm leading-6 text-muted">This view is ready for the matching product phase without shipping future AI behavior early.</p>
+          </div>
+        )}
       </aside>
     </div>
   );
