@@ -21,6 +21,7 @@ pub fn run() {
             commands::project::list_projects,
             commands::project::create_project,
             commands::project::list_project_photos,
+            commands::project::list_project_album_candidates,
             commands::project::get_project_analysis_summary,
             commands::project::initialize_project_database,
             commands::scan::start_scan,

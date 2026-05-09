@@ -69,6 +69,8 @@ export function OperationsPage({
   const keepCount = analysisTask?.keepCount ?? analysisSummary?.keepCount ?? 0;
   const reviewCount = analysisTask?.reviewCount ?? analysisSummary?.reviewCount ?? 0;
   const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
+  const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
+  const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
   const averageScore = analysisTask?.averageScore ?? analysisSummary?.averageOverallScore ?? 0;
 
   return (
@@ -239,6 +241,14 @@ export function OperationsPage({
               <span>Reject picks</span>
               <span className="text-text">{rejectCount}</span>
             </div>
+            <div className="flex items-center justify-between">
+              <span>High-confidence decisions</span>
+              <span className="text-text">{highConfidenceCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Album candidates</span>
+              <span className="text-text">{albumCandidateCount}</span>
+            </div>
           </div>
           <div className="mt-5 rounded-[20px] border border-white/8 bg-card/50 p-4 text-sm text-muted">
             <div className="flex items-center gap-3 text-text">
@@ -246,7 +256,7 @@ export function OperationsPage({
               <span>Grouping summary</span>
             </div>
             <p className="mt-3 leading-7">
-              Duplicate grouping now clusters near-identical frames using perceptual similarity, burst grouping clusters closely timed capture sequences, and the first ranking pass converts that analysis into explainable keep, review, and reject recommendations.
+              Duplicate grouping now clusters near-identical frames using perceptual similarity, burst grouping clusters closely timed capture sequences, and the ranking pass now adds confidence and album-candidate guidance to explainable keep, review, and reject recommendations.
             </p>
           </div>
           {analysisTask ? (

@@ -43,6 +43,8 @@ pub struct QualityAnalysisTaskSnapshot {
     pub keep_count: u64,
     pub review_count: u64,
     pub reject_count: u64,
+    pub high_confidence_count: u64,
+    pub album_candidate_count: u64,
 }
 
 impl QualityAnalysisTaskSnapshot {

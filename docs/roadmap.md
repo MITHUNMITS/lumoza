@@ -4,8 +4,8 @@
 
 Lumoza has completed Phase 1 foundation and is now in Phase 2 implementation.
 
-Current full product progress: 39%
-Current active phase progress: 55% (Phase 2)
+Current full product progress: 43%
+Current active phase progress: 65% (Phase 2)
 
 ## Phases
 
@@ -60,11 +60,11 @@ Every phase should be completed and reviewed before the next phase begins.
 
 This percentage is full-program progress, not phase-local progress.
 
-Current weighted estimate: `39%` overall.
+Current weighted estimate: `43%` overall.
 
 Interpretation:
 - Phase 1: 100% complete
-- Phase 2: 55% complete
+- Phase 2: 65% complete
 - Phase 3: 0% complete
 - Phase 4: 0% complete
 - Phase 5: 0% complete

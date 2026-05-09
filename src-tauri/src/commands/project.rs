@@ -51,6 +51,9 @@ pub struct ProjectPhotoResponse {
     pub ranking_score: Option<f64>,
     pub selection_label: Option<String>,
     pub selection_reason: Option<String>,
+    pub confidence_score: Option<f64>,
+    pub confidence_label: Option<String>,
+    pub album_candidate: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +66,37 @@ pub struct ProjectAnalysisSummaryResponse {
     pub keep_count: u64,
     pub review_count: u64,
     pub reject_count: u64,
+    pub high_confidence_count: u64,
+    pub album_candidate_count: u64,
+}
+
+
+fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPhotoResponse {
+    ProjectPhotoResponse {
+        id: photo.id,
+        absolute_path: photo.absolute_path,
+        filename: photo.filename,
+        extension: photo.extension,
+        file_size_bytes: photo.file_size_bytes,
+        width: photo.width,
+        height: photo.height,
+        modified_at: photo.modified_at,
+        thumbnail_status: photo.thumbnail_status,
+        thumbnail_cache_path: photo.thumbnail_cache_path,
+        sharpness_score: photo.sharpness_score,
+        exposure_score: photo.exposure_score,
+        contrast_score: photo.contrast_score,
+        resolution_score: photo.resolution_score,
+        overall_score: photo.overall_score,
+        duplicate_group_id: photo.duplicate_group_id,
+        burst_group_id: photo.burst_group_id,
+        ranking_score: photo.ranking_score,
+        selection_label: photo.selection_label,
+        selection_reason: photo.selection_reason,
+        confidence_score: photo.confidence_score,
+        confidence_label: photo.confidence_label,
+        album_candidate: photo.album_candidate,
+    }
 }
 
 #[tauri::command]
@@ -123,31 +157,26 @@ pub fn list_project_photos(
     )
     .map_err(|error| error.to_string())?;
 
-    Ok(photos
-        .into_iter()
-        .map(|photo| ProjectPhotoResponse {
-            id: photo.id,
-            absolute_path: photo.absolute_path,
-            filename: photo.filename,
-            extension: photo.extension,
-            file_size_bytes: photo.file_size_bytes,
-            width: photo.width,
-            height: photo.height,
-            modified_at: photo.modified_at,
-            thumbnail_status: photo.thumbnail_status,
-            thumbnail_cache_path: photo.thumbnail_cache_path,
-            sharpness_score: photo.sharpness_score,
-            exposure_score: photo.exposure_score,
-            contrast_score: photo.contrast_score,
-            resolution_score: photo.resolution_score,
-            overall_score: photo.overall_score,
-            duplicate_group_id: photo.duplicate_group_id,
-            burst_group_id: photo.burst_group_id,
-            ranking_score: photo.ranking_score,
-            selection_label: photo.selection_label,
-            selection_reason: photo.selection_reason,
-        })
-        .collect())
+    Ok(photos.into_iter().map(map_project_photo_response).collect())
+}
+
+#[tauri::command]
+pub fn list_project_album_candidates(
+    app: AppHandle,
+    project_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<ProjectPhotoResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let photos = database::list_album_candidate_photos(
+        PathBuf::from(&project.project_db_path).as_path(),
+        limit.unwrap_or(12),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(photos.into_iter().map(map_project_photo_response).collect())
 }
 
 #[tauri::command]
@@ -167,6 +196,8 @@ pub fn get_project_analysis_summary(app: AppHandle, project_id: String) -> Resul
         keep_count: summary.keep_count,
         review_count: summary.review_count,
         reject_count: summary.reject_count,
+        high_confidence_count: summary.high_confidence_count,
+        album_candidate_count: summary.album_candidate_count,
     })
 }
 

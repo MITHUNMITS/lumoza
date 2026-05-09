@@ -40,6 +40,9 @@ pub struct PhotoCurationScoreRecord {
     pub selection_reason: String,
     pub duplicate_penalty: f64,
     pub burst_penalty: f64,
+    pub confidence_score: f64,
+    pub confidence_label: String,
+    pub album_candidate: bool,
 }
 
 #[derive(Debug, Default)]
@@ -359,7 +362,10 @@ fn build_curation_scores(
             let burst_penalty = burst_penalty(burst_rank);
             let ranking_score = clamp_score(artifact.metrics.overall_score - duplicate_penalty - burst_penalty);
             let selection_label = selection_label(ranking_score);
-            let selection_reason = selection_reason(artifact.metrics.overall_score, duplicate_rank, burst_rank);
+            let confidence_score = confidence_score(ranking_score, artifact.metrics.overall_score, duplicate_rank, burst_rank);
+            let confidence_label = confidence_label(confidence_score);
+            let album_candidate = is_album_candidate(selection_label, confidence_score, duplicate_rank, burst_rank);
+            let selection_reason = selection_reason(artifact.metrics.overall_score, duplicate_rank, burst_rank, confidence_label);
 
             PhotoCurationScoreRecord {
                 photo_id: artifact.photo_id.clone(),
@@ -368,6 +374,9 @@ fn build_curation_scores(
                 selection_reason,
                 duplicate_penalty,
                 burst_penalty,
+                confidence_score,
+                confidence_label: confidence_label.to_string(),
+                album_candidate,
             }
         })
         .collect()
@@ -399,7 +408,38 @@ fn selection_label(score: f64) -> &'static str {
     }
 }
 
-fn selection_reason(overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> String {
+fn confidence_score(ranking_score: f64, overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> f64 {
+    let distance_from_review_edge = (ranking_score - 0.56).abs().min((ranking_score - 0.78).abs());
+    let boundary_confidence = clamp_score(0.48 + distance_from_review_edge * 2.4);
+    let quality_confidence = clamp_score(overall_score * 0.7 + ranking_score * 0.3);
+    let grouping_confidence = match (duplicate_rank, burst_rank) {
+        (Some(0), Some(0)) => 0.95,
+        (Some(0), _) | (_, Some(0)) => 0.88,
+        (Some(_), _) | (_, Some(_)) => 0.68,
+        _ => 0.78,
+    };
+
+    clamp_score(boundary_confidence * 0.38 + quality_confidence * 0.42 + grouping_confidence * 0.20)
+}
+
+fn confidence_label(score: f64) -> &'static str {
+    if score >= 0.76 {
+        "high"
+    } else if score >= 0.58 {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn is_album_candidate(selection_label: &str, confidence_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>) -> bool {
+    selection_label == "keep"
+        && confidence_score >= 0.72
+        && !matches!(duplicate_rank, Some(rank) if rank > 0)
+        && !matches!(burst_rank, Some(rank) if rank > 1)
+}
+
+fn selection_reason(overall_score: f64, duplicate_rank: Option<usize>, burst_rank: Option<usize>, confidence_label: &str) -> String {
     let quality_note = if overall_score >= 0.82 {
         "strong technical quality"
     } else if overall_score >= 0.68 {
@@ -430,6 +470,7 @@ fn selection_reason(overall_score: f64, duplicate_rank: Option<usize>, burst_ran
     if duplicate_note.is_none() && burst_note.is_none() {
         notes.push("standalone frame".to_string());
     }
+    notes.push(format!("{confidence_label} confidence"));
 
     notes.join("; ")
 }

@@ -28,6 +28,9 @@ interface RawProjectPhoto {
   rankingScore?: number;
   selectionLabel?: "keep" | "review" | "reject";
   selectionReason?: string;
+  confidenceScore?: number;
+  confidenceLabel?: "high" | "medium" | "low";
+  albumCandidate?: boolean;
 }
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -55,7 +58,10 @@ function createMockPhotos(projectId: string, count: number): ProjectPhoto[] {
     burstGroupId: index % 9 < 3 ? `burst-${Math.floor(index / 9)}` : undefined,
     rankingScore: 0.48 + (index % 7) * 0.07,
     selectionLabel: index % 7 < 2 ? "keep" : index % 7 < 5 ? "review" : "reject",
-    selectionReason: index % 7 < 2 ? "strong technical quality; standalone frame" : index % 7 < 5 ? "usable technical quality; secondary burst frame" : "weak technical quality; lower-ranked duplicate frame",
+    selectionReason: index % 7 < 2 ? "strong technical quality; standalone frame; high confidence" : index % 7 < 5 ? "usable technical quality; secondary burst frame; medium confidence" : "weak technical quality; lower-ranked duplicate frame; low confidence",
+    confidenceScore: 0.52 + (index % 5) * 0.09,
+    confidenceLabel: index % 5 > 2 ? "high" : index % 5 > 0 ? "medium" : "low",
+    albumCandidate: index % 7 < 2 && index % 5 > 2,
   }));
 }
 
@@ -76,6 +82,9 @@ function mapPhoto(photo: RawProjectPhoto): ProjectPhoto {
     rankingScore: photo.rankingScore,
     selectionLabel: photo.selectionLabel,
     selectionReason: photo.selectionReason,
+    confidenceScore: photo.confidenceScore,
+    confidenceLabel: photo.confidenceLabel,
+    albumCandidate: photo.albumCandidate ?? false,
     quality:
       photo.overallScore === undefined &&
       photo.sharpnessScore === undefined &&
@@ -104,5 +113,20 @@ export async function listProjectPhotos(projectId: string, options: ListProjectP
   }
 
   const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_photos", { projectId, offset, limit });
+  return photos.map(mapPhoto);
+}
+
+
+export async function listAlbumCandidatePhotos(projectId: string, limit = 12): Promise<ProjectPhoto[]> {
+  if (!hasTauriRuntime()) {
+    const projects = await listProjects();
+    const project = projects.find((entry) => entry.projectId === projectId);
+    return createMockPhotos(projectId, project?.photoCount ?? 0)
+      .filter((photo) => photo.albumCandidate)
+      .sort((left, right) => (right.confidenceScore ?? 0) - (left.confidenceScore ?? 0))
+      .slice(0, limit);
+  }
+
+  const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_album_candidates", { projectId, limit });
   return photos.map(mapPhoto);
 }

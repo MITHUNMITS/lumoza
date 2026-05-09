@@ -212,6 +212,16 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
                             {photo.selectionLabel}
                           </span>
                         ) : null}
+                        {photo.confidenceLabel ? (
+                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${photo.confidenceLabel === "high" ? "bg-accent/18 text-accent" : photo.confidenceLabel === "medium" ? "bg-warning/15 text-warning" : "bg-white/10 text-subtle"}`}>
+                            {photo.confidenceLabel} confidence
+                          </span>
+                        ) : null}
+                        {photo.albumCandidate ? (
+                          <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-text">
+                            album pick
+                          </span>
+                        ) : null}
                         {photo.duplicateGroupId ? (
                           <span className="rounded-full bg-warning/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-warning">
                             duplicate set
@@ -248,7 +258,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
                       </div>
                       <div className="flex items-center justify-between gap-3 text-xs text-subtle">
                         <span>{photo.selectionReason ?? "Selection reason pending"}</span>
-                        <span>{rankingScore !== undefined ? `${(rankingScore * 100).toFixed(0)} rank` : "Unranked"}</span>
+                        <span>{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)} conf` : rankingScore !== undefined ? `${(rankingScore * 100).toFixed(0)} rank` : "Unranked"}</span>
                       </div>
                     </div>
                   </article>

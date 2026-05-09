@@ -12,6 +12,7 @@ print(
                 "technical-quality-contract",
                 "duplicate-burst-contract",
             "selection-ranking-contract",
+            "confidence-ranking-contract",
             ],
         }
     )

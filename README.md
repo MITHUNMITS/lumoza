@@ -8,11 +8,11 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current full product progress: 39%
-Current active phase progress: 55% (Phase 2)
+Current full product progress: 43%
+Current active phase progress: 65% (Phase 2)
 
 Phase 1 status: 100% complete, including native Rust/Tauri compile and macOS app bundle validation.
-Phase 2 status: 55% complete, with technical-quality scoring, duplicate/burst grouping, and a first explainable ranking pass now in place.
+Phase 2 status: 65% complete, with technical-quality scoring, duplicate/burst grouping, ranking confidence, and project-wide album-candidate shortlist queries now in place.
 
 Immediate repo priorities:
 
@@ -24,11 +24,11 @@ Immediate repo priorities:
 
 Full product progress is tracked separately from phase completion.
 
-Current weighted estimate: `39%` overall.
+Current weighted estimate: `43%` overall.
 
 Basis:
 - Phase 1 foundation: `100%` complete
-- Phase 2 fast AI engine: `55%` complete
+- Phase 2 fast AI engine: `65%` complete
 - Phase 3 face intelligence: `0%` complete
 - Phase 4 smart selection engine: `0%` complete
 - Phase 5 professional polish: `0%` complete

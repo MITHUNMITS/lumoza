@@ -50,6 +50,8 @@ pub fn start_quality_analysis(
         keep_count: 0,
         review_count: 0,
         reject_count: 0,
+        high_confidence_count: 0,
+        album_candidate_count: 0,
     };
 
     let control = Arc::new(ScanTaskControl::default());
@@ -117,6 +119,8 @@ fn run_quality_analysis_task(
     let keep_count = result.curation_scores.iter().filter(|score| score.selection_label == "keep").count() as u64;
     let review_count = result.curation_scores.iter().filter(|score| score.selection_label == "review").count() as u64;
     let reject_count = result.curation_scores.iter().filter(|score| score.selection_label == "reject").count() as u64;
+    let high_confidence_count = result.curation_scores.iter().filter(|score| score.confidence_label == "high").count() as u64;
+    let album_candidate_count = result.curation_scores.iter().filter(|score| score.album_candidate).count() as u64;
 
     let persist_result = database::persist_quality_analysis(
         Path::new(&project_db_path),
@@ -142,9 +146,11 @@ fn run_quality_analysis_task(
                 task.keep_count = keep_count;
                 task.review_count = review_count;
                 task.reject_count = reject_count;
+                task.high_confidence_count = high_confidence_count;
+                task.album_candidate_count = album_candidate_count;
                 task.message = if result.cancelled {
                     format!(
-                        "Cancelled after analyzing {} photos. Average score {:.0}%. Found {} duplicate groups, {} burst groups, and ranked {} keep / {} review / {} reject before stop.",
+                        "Cancelled after analyzing {} photos. Average score {:.0}%. Found {} duplicate groups, {} burst groups, ranked {} keep / {} review / {} reject, and marked {} album candidates before stop.",
                         analyzed_count,
                         average_score * 100.0,
                         duplicate_group_count,
@@ -152,10 +158,11 @@ fn run_quality_analysis_task(
                         keep_count,
                         review_count,
                         reject_count,
+                        album_candidate_count,
                     )
                 } else {
                     format!(
-                        "Analyzed {} photos with average score {:.0}%. Found {} duplicate groups, {} burst groups, ranked {} keep / {} review / {} reject, and recorded {} failures.",
+                        "Analyzed {} photos with average score {:.0}%. Found {} duplicate groups, {} burst groups, ranked {} keep / {} review / {} reject, marked {} high-confidence decisions and {} album candidates, and recorded {} failures.",
                         analyzed_count,
                         average_score * 100.0,
                         duplicate_group_count,
@@ -163,6 +170,8 @@ fn run_quality_analysis_task(
                         keep_count,
                         review_count,
                         reject_count,
+                        high_confidence_count,
+                        album_candidate_count,
                         failed_count,
                     )
                 };

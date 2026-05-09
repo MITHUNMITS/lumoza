@@ -13,10 +13,11 @@ use crate::{
     },
 };
 
-const MIGRATIONS: [&str; 3] = [
+const MIGRATIONS: [&str; 4] = [
     include_str!("../../migrations/0001_init.sql"),
     include_str!("../../migrations/0002_analysis.sql"),
     include_str!("../../migrations/0003_ranking.sql"),
+    include_str!("../../migrations/0004_curation_confidence.sql"),
 ];
 
 #[derive(Debug)]
@@ -47,6 +48,9 @@ pub struct ProjectPhotoRecord {
     pub ranking_score: Option<f64>,
     pub selection_label: Option<String>,
     pub selection_reason: Option<String>,
+    pub confidence_score: Option<f64>,
+    pub confidence_label: Option<String>,
+    pub album_candidate: bool,
 }
 
 #[derive(Debug)]
@@ -58,6 +62,8 @@ pub struct ProjectAnalysisSummaryRecord {
     pub keep_count: u64,
     pub review_count: u64,
     pub reject_count: u64,
+    pub high_confidence_count: u64,
+    pub album_candidate_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +114,7 @@ pub fn persist_scan(
         [],
     )?;
     transaction.execute("DELETE FROM duplicate_groups", [])?;
+    transaction.execute("DELETE FROM photo_curation_recommendations", [])?;
     transaction.execute("DELETE FROM photo_curation_scores", [])?;
     transaction.execute("DELETE FROM photo_quality_metrics", [])?;
     transaction.execute("DELETE FROM analysis_runs", [])?;
@@ -213,11 +220,15 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
             burst_groups.id,
             photo_curation_scores.ranking_score,
             photo_curation_scores.selection_label,
-            photo_curation_scores.selection_reason
+            photo_curation_scores.selection_reason,
+            photo_curation_recommendations.confidence_score,
+            photo_curation_recommendations.confidence_label,
+            photo_curation_recommendations.album_candidate
          FROM photos
          LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
          LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
          LEFT JOIN photo_curation_scores ON photo_curation_scores.photo_id = photos.id
+         LEFT JOIN photo_curation_recommendations ON photo_curation_recommendations.photo_id = photos.id
          LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
          LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
          LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
@@ -248,6 +259,89 @@ pub fn list_project_photos(path: &Path, offset: u32, limit: u32) -> anyhow::Resu
             ranking_score: row.get::<_, Option<f64>>(17)?,
             selection_label: row.get::<_, Option<String>>(18)?,
             selection_reason: row.get::<_, Option<String>>(19)?,
+            confidence_score: row.get::<_, Option<f64>>(20)?,
+            confidence_label: row.get::<_, Option<String>>(21)?,
+            album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+        })
+    })?;
+
+    let mut photos = Vec::new();
+    for row in rows {
+        photos.push(row?);
+    }
+
+    Ok(photos)
+}
+
+
+pub fn list_album_candidate_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let safe_limit = limit.clamp(1, 60);
+    let mut statement = connection.prepare(
+        "SELECT
+            photos.id,
+            photos.absolute_path,
+            photos.filename,
+            photos.extension,
+            photos.file_size_bytes,
+            photos.width,
+            photos.height,
+            photos.modified_at,
+            photos.thumbnail_status,
+            thumbnails.cache_path,
+            photo_quality_metrics.sharpness_score,
+            photo_quality_metrics.exposure_score,
+            photo_quality_metrics.contrast_score,
+            photo_quality_metrics.resolution_score,
+            photo_quality_metrics.overall_score,
+            duplicate_groups.id,
+            burst_groups.id,
+            photo_curation_scores.ranking_score,
+            photo_curation_scores.selection_label,
+            photo_curation_scores.selection_reason,
+            photo_curation_recommendations.confidence_score,
+            photo_curation_recommendations.confidence_label,
+            photo_curation_recommendations.album_candidate
+         FROM photos
+         LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
+         LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
+         LEFT JOIN photo_curation_scores ON photo_curation_scores.photo_id = photos.id
+         LEFT JOIN photo_curation_recommendations ON photo_curation_recommendations.photo_id = photos.id
+         LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
+         LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         WHERE photo_curation_recommendations.album_candidate = 1
+         ORDER BY photo_curation_recommendations.confidence_score DESC, photo_curation_scores.ranking_score DESC, photos.filename ASC
+         LIMIT ?1",
+    )?;
+
+    let rows = statement.query_map(params![safe_limit as i64], |row| {
+        Ok(ProjectPhotoRecord {
+            id: row.get::<_, String>(0)?,
+            absolute_path: row.get::<_, String>(1)?,
+            filename: row.get::<_, String>(2)?,
+            extension: row.get::<_, String>(3)?,
+            file_size_bytes: row.get::<_, i64>(4)? as u64,
+            width: row.get::<_, Option<i64>>(5)?.map(|value| value as u32),
+            height: row.get::<_, Option<i64>>(6)?.map(|value| value as u32),
+            modified_at: row.get::<_, Option<String>>(7)?,
+            thumbnail_status: row.get::<_, String>(8)?,
+            thumbnail_cache_path: row.get::<_, Option<String>>(9)?,
+            sharpness_score: row.get::<_, Option<f64>>(10)?,
+            exposure_score: row.get::<_, Option<f64>>(11)?,
+            contrast_score: row.get::<_, Option<f64>>(12)?,
+            resolution_score: row.get::<_, Option<f64>>(13)?,
+            overall_score: row.get::<_, Option<f64>>(14)?,
+            duplicate_group_id: row.get::<_, Option<String>>(15)?,
+            burst_group_id: row.get::<_, Option<String>>(16)?,
+            ranking_score: row.get::<_, Option<f64>>(17)?,
+            selection_label: row.get::<_, Option<String>>(18)?,
+            selection_reason: row.get::<_, Option<String>>(19)?,
+            confidence_score: row.get::<_, Option<f64>>(20)?,
+            confidence_label: row.get::<_, Option<String>>(21)?,
+            album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
         })
     })?;
 
@@ -305,6 +399,18 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
         |row| Ok(row.get::<_, i64>(0)? as u64),
     )?;
 
+    let high_confidence_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_curation_recommendations WHERE confidence_label = 'high'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let album_candidate_count = connection.query_row(
+        "SELECT COUNT(*) FROM photo_curation_recommendations WHERE album_candidate = 1",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
     Ok(ProjectAnalysisSummaryRecord {
         analyzed_photo_count,
         average_overall_score,
@@ -313,6 +419,8 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
         keep_count,
         review_count,
         reject_count,
+        high_confidence_count,
+        album_candidate_count,
     })
 }
 
@@ -358,6 +466,7 @@ pub fn persist_quality_analysis(
 
     transaction.execute("DELETE FROM duplicate_group_members", [])?;
     transaction.execute("DELETE FROM duplicate_groups", [])?;
+    transaction.execute("DELETE FROM photo_curation_recommendations", [])?;
     transaction.execute("DELETE FROM photo_curation_scores", [])?;
 
     transaction.execute(
@@ -417,7 +526,7 @@ pub fn persist_quality_analysis(
     persist_group_records(&transaction, analysis_run_id, burst_groups, "burst", &now)?;
 
     {
-        let mut statement = transaction.prepare(
+        let mut score_statement = transaction.prepare(
             "INSERT INTO photo_curation_scores (
                 photo_id,
                 analysis_run_id,
@@ -437,9 +546,25 @@ pub fn persist_quality_analysis(
                burst_penalty = excluded.burst_penalty,
                created_at = excluded.created_at",
         )?;
+        let mut recommendation_statement = transaction.prepare(
+            "INSERT INTO photo_curation_recommendations (
+                photo_id,
+                analysis_run_id,
+                confidence_score,
+                confidence_label,
+                album_candidate,
+                created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(photo_id) DO UPDATE SET
+               analysis_run_id = excluded.analysis_run_id,
+               confidence_score = excluded.confidence_score,
+               confidence_label = excluded.confidence_label,
+               album_candidate = excluded.album_candidate,
+               created_at = excluded.created_at",
+        )?;
 
         for score in curation_scores {
-            statement.execute(params![
+            score_statement.execute(params![
                 score.photo_id.as_str(),
                 analysis_run_id,
                 score.ranking_score,
@@ -447,6 +572,14 @@ pub fn persist_quality_analysis(
                 score.selection_reason.as_str(),
                 score.duplicate_penalty,
                 score.burst_penalty,
+                now.as_str(),
+            ])?;
+            recommendation_statement.execute(params![
+                score.photo_id.as_str(),
+                analysis_run_id,
+                score.confidence_score,
+                score.confidence_label.as_str(),
+                if score.album_candidate { 1_i64 } else { 0_i64 },
                 now.as_str(),
             ])?;
         }
@@ -460,16 +593,17 @@ pub fn persist_quality_analysis(
             "quality_analysis_completed",
             if failed_count > 0 { "warning" } else { "info" },
             format!(
-                "Analyzed {} photos, found {} duplicate groups, {} burst groups, and ranked {} keep / {} review / {} reject decisions.",
+                "Analyzed {} photos, found {} duplicate groups, {} burst groups, ranked {} keep / {} review / {} reject decisions, and marked {} album candidates.",
                 metrics.len(),
                 duplicate_groups.len(),
                 burst_groups.len(),
                 curation_scores.iter().filter(|score| score.selection_label == "keep").count(),
                 curation_scores.iter().filter(|score| score.selection_label == "review").count(),
                 curation_scores.iter().filter(|score| score.selection_label == "reject").count(),
+                curation_scores.iter().filter(|score| score.album_candidate).count(),
             ),
             format!(
-                r#"{{"failedCount": {}, "analyzedCount": {}, "duplicateGroupCount": {}, "burstGroupCount": {}, "keepCount": {}, "reviewCount": {}, "rejectCount": {}}}"#,
+                r#"{{"failedCount": {}, "analyzedCount": {}, "duplicateGroupCount": {}, "burstGroupCount": {}, "keepCount": {}, "reviewCount": {}, "rejectCount": {}, "highConfidenceCount": {}, "albumCandidateCount": {}}}"#,
                 failed_count,
                 metrics.len(),
                 duplicate_groups.len(),
@@ -477,6 +611,8 @@ pub fn persist_quality_analysis(
                 curation_scores.iter().filter(|score| score.selection_label == "keep").count(),
                 curation_scores.iter().filter(|score| score.selection_label == "review").count(),
                 curation_scores.iter().filter(|score| score.selection_label == "reject").count(),
+                curation_scores.iter().filter(|score| score.confidence_label == "high").count(),
+                curation_scores.iter().filter(|score| score.album_candidate).count(),
             ),
             now.as_str(),
         ],

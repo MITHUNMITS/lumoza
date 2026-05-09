@@ -20,6 +20,8 @@ export interface ProjectAnalysisSummary {
   keepCount: number;
   reviewCount: number;
   rejectCount: number;
+  highConfidenceCount: number;
+  albumCandidateCount: number;
 }
 
 export interface ProjectPhotoQualitySummary {
@@ -31,6 +33,7 @@ export interface ProjectPhotoQualitySummary {
 }
 
 export type SelectionLabel = "keep" | "review" | "reject";
+export type ConfidenceLabel = "high" | "medium" | "low";
 
 export interface ProjectPhoto {
   id: string;
@@ -49,6 +52,9 @@ export interface ProjectPhoto {
   rankingScore?: number;
   selectionLabel?: SelectionLabel;
   selectionReason?: string;
+  confidenceScore?: number;
+  confidenceLabel?: ConfidenceLabel;
+  albumCandidate: boolean;
 }
 
 export interface CreateProjectInput {

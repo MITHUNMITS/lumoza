@@ -35,6 +35,8 @@ export interface QualityAnalysisTask {
   keepCount: number;
   reviewCount: number;
   rejectCount: number;
+  highConfidenceCount: number;
+  albumCandidateCount: number;
 }
 
 export interface ActivityItem {

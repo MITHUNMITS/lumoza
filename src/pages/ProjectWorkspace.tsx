@@ -7,6 +7,7 @@ import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/syste
 interface ProjectWorkspaceProps {
   project: ProjectSummary;
   photos: ProjectPhoto[];
+  albumCandidates: ProjectPhoto[];
   analysisSummary?: ProjectAnalysisSummary;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
@@ -35,6 +36,7 @@ function averageQualityScore(photos: ProjectPhoto[]) {
 export function ProjectWorkspace({
   project,
   photos,
+  albumCandidates,
   analysisSummary,
   isLoadingPhotos,
   isLoadingMorePhotos,
@@ -57,6 +59,9 @@ export function ProjectWorkspace({
   const keepCount = analysisTask?.keepCount ?? analysisSummary?.keepCount ?? 0;
   const reviewCount = analysisTask?.reviewCount ?? analysisSummary?.reviewCount ?? 0;
   const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
+  const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
+  const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
+  const visibleAlbumCandidates = albumCandidates.slice(0, 5);
   const analyzedCount = analysisTask?.analyzedCount ?? analysisSummary?.analyzedPhotoCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length;
 
   return (
@@ -126,9 +131,35 @@ export function ProjectWorkspace({
               <span className="text-text">{rejectCount}</span>
             </div>
             <div className="flex items-center justify-between">
+              <span>High-confidence decisions</span>
+              <span className="text-text">{highConfidenceCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Album candidates</span>
+              <span className="text-text">{albumCandidateCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
               <span>Analysis failures</span>
               <span className="text-text">{analysisTask?.failedCount ?? 0}</span>
             </div>
+          </div>
+        </div>
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">Album shortlist</p>
+          <div className="mt-4 space-y-3">
+            {visibleAlbumCandidates.length === 0 ? (
+              <p className="text-sm leading-7 text-muted">Run analysis to surface high-confidence keep picks for album review.</p>
+            ) : (
+              visibleAlbumCandidates.map((photo) => (
+                <div key={photo.id} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-text">{photo.filename}</span>
+                    <span className="text-accent">{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)}%` : "candidate"}</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-subtle">{photo.selectionReason ?? "Selection reason pending"}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
         <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
