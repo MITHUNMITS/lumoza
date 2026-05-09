@@ -85,7 +85,7 @@ export function OperationsPage({
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
       <section className="grid gap-5">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <div className="lumoza-card rounded-[28px] p-5">
             <div className="flex items-center gap-3 text-accent">
               <Activity className="h-5 w-5" />
               <p className="text-sm uppercase tracking-[0.22em]">Activity</p>
@@ -93,7 +93,7 @@ export function OperationsPage({
             <p className="mt-4 text-3xl font-semibold text-text">{activity.length}</p>
             <p className="mt-2 text-sm text-muted">Recent operational events retained in memory for the current session.</p>
           </div>
-          <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <div className="lumoza-card rounded-[28px] p-5">
             <div className="flex items-center gap-3 text-warning">
               <AlertTriangle className="h-5 w-5" />
               <p className="text-sm uppercase tracking-[0.22em]">Incidents</p>
@@ -101,7 +101,7 @@ export function OperationsPage({
             <p className="mt-4 text-3xl font-semibold text-text">{incidents.length}</p>
             <p className="mt-2 text-sm text-muted">Warnings and errors surfaced by scanning, thumbnails, Phase 2 analysis, or Phase 3 people intelligence.</p>
           </div>
-          <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <div className="lumoza-card rounded-[28px] p-5">
             <div className={`flex items-center gap-3 ${statusTone(systemStatus)}`}>
               <ShieldCheck className="h-5 w-5" />
               <p className="text-sm uppercase tracking-[0.22em]">Health</p>
@@ -111,10 +111,10 @@ export function OperationsPage({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-muted">Activity timeline</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Activity timeline</p>
               <h2 className="mt-2 text-2xl font-semibold text-text">Operational history</h2>
             </div>
             <div className="rounded-full border border-white/8 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.22em] text-muted">
@@ -128,10 +128,10 @@ export function OperationsPage({
               </div>
             ) : (
               activity.map((item) => (
-                <div key={item.id} className="rounded-[20px] border border-white/8 bg-ink/30 p-4">
+                <div key={item.id} className="rounded-[22px] border border-white/8 bg-ink/35 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-subtle">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-subtle">
                         <span>{formatEventLabel(item.eventType)}</span>
                         <span className={item.severity === "error" ? "text-danger" : item.severity === "warning" ? "text-warning" : "text-accent"}>
                           {item.severity}
@@ -149,10 +149,10 @@ export function OperationsPage({
       </section>
 
       <section className="grid gap-5">
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-muted">Error report</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Error report</p>
               <h3 className="mt-2 text-xl font-semibold text-text">Current risks</h3>
             </div>
             <span className="rounded-full border border-white/8 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.22em] text-muted">
@@ -166,7 +166,7 @@ export function OperationsPage({
               </div>
             ) : (
               incidents.map((item) => (
-                <div key={item.id} className="rounded-[20px] border border-white/8 bg-ink/30 p-4">
+                <div key={item.id} className="rounded-[22px] border border-white/8 bg-ink/35 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className={`text-xs uppercase tracking-[0.22em] ${item.severity === "error" ? "text-danger" : "text-warning"}`}>
                       {item.severity}
@@ -180,7 +180,7 @@ export function OperationsPage({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 text-accent">
@@ -200,31 +200,31 @@ export function OperationsPage({
           </div>
           {systemError ? <div className="mt-5 rounded-[20px] border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{systemError}</div> : null}
           <div className="mt-5 grid gap-3 text-sm text-muted">
-            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/30 px-4 py-3">
+            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/35 px-4 py-3">
               <span>Python sidecar</span>
               <span className="text-text">{systemStatus?.pythonSidecar ?? "unknown"}</span>
             </div>
-            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/30 px-4 py-3">
+            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/35 px-4 py-3">
               <span>SQLite</span>
               <span className="text-text">{systemStatus?.sqlite ?? "unknown"}</span>
             </div>
-            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/30 px-4 py-3">
+            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/35 px-4 py-3">
               <span>Registry</span>
               <span className="text-text">{systemStatus?.registry ?? "unknown"}</span>
             </div>
-            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/30 px-4 py-3">
+            <div className="flex items-center justify-between rounded-[18px] border border-white/8 bg-ink/35 px-4 py-3">
               <span>Active native tasks</span>
               <span className="text-text">{systemStatus?.activeTaskCount ?? 0}</span>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center gap-3 text-accent">
             <BrainCircuit className="h-5 w-5" />
-            <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 3 people intelligence</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Phase 3 people intelligence</p>
           </div>
-          <div className="mt-4 grid gap-3 rounded-[20px] border border-white/8 bg-ink/30 p-4 text-sm text-muted">
+          <div className="mt-4 grid gap-3 rounded-[22px] border border-white/8 bg-ink/35 p-4 text-sm text-muted">
             <div className="flex items-center justify-between">
               <span>Detected faces</span>
               <span className="text-text">{detectedFaceCount}</span>
@@ -254,12 +254,12 @@ export function OperationsPage({
             This is the Phase 3 foundation layer: persistence and reporting are ready, while real local detection, embeddings, clustering, and people priority controls remain open.
           </p>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center gap-3 text-accent">
             <BrainCircuit className="h-5 w-5" />
-            <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 2 analysis</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Phase 2 analysis</p>
           </div>
-          <div className="mt-4 grid gap-3 rounded-[20px] border border-white/8 bg-ink/30 p-4 text-sm text-muted">
+          <div className="mt-4 grid gap-3 rounded-[22px] border border-white/8 bg-ink/35 p-4 text-sm text-muted">
             <div className="flex items-center justify-between">
               <span>Average score</span>
               <span className="text-text">{(averageScore * 100).toFixed(0)}%</span>
@@ -316,7 +316,7 @@ export function OperationsPage({
                 <span>Analyzed</span>
                 <span className="text-text">{analysisTask.analyzedCount}</span>
               </div>
-              <p className="rounded-[18px] border border-white/8 bg-ink/30 p-4 leading-7 text-text">{analysisTask.message}</p>
+              <p className="rounded-[18px] border border-white/8 bg-ink/35 p-4 leading-7 text-text">{analysisTask.message}</p>
             </div>
           ) : task ? (
             <p className="mt-4 text-sm leading-7 text-muted">Scan activity is present, but technical quality analysis has not run for this session yet.</p>

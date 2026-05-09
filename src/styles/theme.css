@@ -1,0 +1,153 @@
+:root {
+  --lz-bg: #0F1115;
+  --lz-bg-soft: #13161C;
+  --lz-panel: #171A21;
+  --lz-card: #1E222B;
+  --lz-card-hover: #252A35;
+  --lz-line: rgba(255, 255, 255, 0.08);
+  --lz-line-strong: rgba(255, 255, 255, 0.14);
+  --lz-text: #F5F7FA;
+  --lz-muted: #B6BEC9;
+  --lz-subtle: #7E8794;
+  --lz-accent: #4D8DFF;
+  --lz-purple: #8B5CF6;
+  --lz-success: #3CCF91;
+  --lz-warning: #FFB84D;
+  --lz-danger: #FF5C7A;
+  --lz-radius-sm: 14px;
+  --lz-radius-md: 20px;
+  --lz-radius-lg: 28px;
+  --lz-radius-xl: 36px;
+  --lz-shadow-panel: 0 30px 110px rgba(0, 0, 0, 0.42);
+  --lz-shadow-card: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --lz-shadow-glow: 0 0 70px rgba(77, 141, 255, 0.18);
+  --lz-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lumoza-surface {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(77, 141, 255, 0.18), transparent 34%),
+    radial-gradient(circle at 82% 12%, rgba(139, 92, 246, 0.14), transparent 32%),
+    radial-gradient(circle at 50% 100%, rgba(60, 207, 145, 0.05), transparent 34%),
+    linear-gradient(145deg, #10131A 0%, #0F1115 46%, #090B0F 100%);
+}
+
+.lumoza-vignette::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent 26%, transparent 74%, rgba(0, 0, 0, 0.24)),
+    radial-gradient(circle at center, transparent 42%, rgba(0, 0, 0, 0.28) 100%);
+}
+
+.lumoza-noise::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px 6px);
+  mix-blend-mode: screen;
+}
+
+.lumoza-glass {
+  border: 1px solid var(--lz-line);
+  background: linear-gradient(145deg, rgba(30, 34, 43, 0.86), rgba(19, 22, 28, 0.78));
+  box-shadow: var(--lz-shadow-card);
+  backdrop-filter: blur(24px) saturate(1.1);
+}
+
+.lumoza-panel {
+  border: 1px solid var(--lz-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%),
+    rgba(23, 26, 33, 0.88);
+  box-shadow: var(--lz-shadow-panel);
+}
+
+.lumoza-card {
+  border: 1px solid var(--lz-line);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 42%),
+    rgba(30, 34, 43, 0.76);
+  box-shadow: var(--lz-shadow-card);
+}
+
+.lumoza-card-hover {
+  transition: border-color 180ms var(--lz-ease), background 180ms var(--lz-ease), transform 180ms var(--lz-ease), box-shadow 180ms var(--lz-ease);
+}
+
+.lumoza-card-hover:hover {
+  border-color: rgba(77, 141, 255, 0.36);
+  background: rgba(37, 42, 53, 0.82);
+  box-shadow: var(--lz-shadow-card), var(--lz-shadow-glow);
+  transform: translateY(-1px);
+}
+
+.lumoza-focus:focus-visible {
+  outline: 2px solid rgba(77, 141, 255, 0.72);
+  outline-offset: 3px;
+}
+
+.lumoza-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 135, 148, 0.5) transparent;
+}
+
+.lumoza-scrollbar::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.lumoza-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lumoza-scrollbar::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(126, 135, 148, 0.48);
+  background-clip: padding-box;
+}
+
+.lumoza-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(182, 190, 201, 0.62);
+  background-clip: padding-box;
+}
+
+.lumoza-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.lumoza-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.11), transparent);
+  animation: lumoza-shimmer 1.7s infinite;
+}
+
+@keyframes lumoza-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes lumoza-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -8px, 0) scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}

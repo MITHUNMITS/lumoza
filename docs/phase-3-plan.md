@@ -7,7 +7,7 @@ Add local people intelligence to Lumoza Studio: face detection readiness, face p
 Current phase status: in progress
 
 Phase 3 progress: 10% complete
-Full product progress: 53% overall
+Full product progress: 55% overall
 
 This first Phase 3 slice is foundation-only. It adds schema, summary plumbing, sidecar capability contracts, and product visibility without pretending that real face detection or clustering has shipped.
 

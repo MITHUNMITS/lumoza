@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
+import { Activity, Aperture, Cpu, FolderOpen, Images, Search, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
+import { LumozaButton } from "../components/ui/LumozaButton";
+import { ProgressBlock } from "../components/ui/ProgressBlock";
+import { StatusPill } from "../components/ui/StatusPill";
 import { StartupSplash } from "../components/splash/StartupSplash";
-import { CreateProject } from "../pages/CreateProject";
 import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
@@ -542,39 +545,101 @@ export function App() {
     return <StartupSplash steps={setupSteps.length ? setupSteps : [{ id: "boot", label: "Bootstrap", status: "running", detail: statusText }]} error={bootError} />;
   }
 
-  const sidebar = (
-    <div className="flex h-full flex-col gap-6">
-      <div>
-        <p className="text-sm uppercase tracking-[0.36em] text-accent/80">Lumoza</p>
-        <h1 className="mt-3 text-3xl font-semibold text-text">Studio</h1>
-        <p className="mt-3 text-sm leading-7 text-muted">Offline-first AI curation now moves from scoring into first-pass ranking and selection guidance.</p>
-      </div>
-      <nav className="grid gap-2 text-sm text-muted">
-        <button type="button" onClick={() => setCurrentView("dashboard")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Dashboard</button>
-        <button type="button" onClick={() => setCurrentView("workspace")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Workspace</button>
-        <button type="button" onClick={() => setCurrentView("operations")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Operations</button>
-        <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
-      </nav>
-      <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Full product progress: 53%
-        Current phase progress: 10% (Phase 3)
+  const navItems: Array<{ id: typeof currentView; label: string; icon: ComponentType<{ className?: string }> }> = [
+    { id: "dashboard", label: "Projects", icon: FolderOpen },
+    { id: "workspace", label: "Workspace", icon: Images },
+    { id: "operations", label: "Operations", icon: Activity },
+    { id: "settings", label: "Settings", icon: Settings },
+  ];
 
-Phase 3 has started with people intelligence foundations: face/people schema, summary plumbing, and readiness surfaces are active. Real face detection, clustering, priority people, final ranking, polish, and release hardening still remain.
+  const sidebar = (
+    <div className="flex h-full flex-col gap-5 p-4 xl:p-5">
+      <div className="flex items-center justify-center gap-3 xl:justify-start">
+        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.055] shadow-glow">
+          <div className="absolute inset-0 rounded-[18px] bg-accent/10 blur-xl" />
+          <Aperture className="relative h-6 w-6 text-accent" />
+        </div>
+        <div className="hidden xl:block">
+          <p className="text-sm font-semibold tracking-[-0.02em] text-text">Lumoza Studio</p>
+          <p className="mt-0.5 text-xs text-subtle">Local AI curation</p>
+        </div>
+      </div>
+
+      <nav className="grid gap-2">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setCurrentView(item.id)}
+              className={`lumoza-focus flex items-center justify-center gap-3 rounded-[20px] border px-3 py-3 text-sm font-semibold transition duration-200 ease-lz xl:justify-start xl:px-4 ${
+                isActive
+                  ? "border-accent/35 bg-accent/12 text-text shadow-glow"
+                  : "border-transparent text-muted hover:border-white/8 hover:bg-white/[0.055] hover:text-text"
+              }`}
+            >
+              <Icon className={`h-5 w-5 ${isActive ? "text-accent" : "text-subtle"}`} />
+              <span className="hidden xl:inline">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto hidden rounded-[26px] border border-white/8 bg-white/[0.04] p-4 xl:block">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <StatusPill tone="purple">Phase 3</StatusPill>
+          <span className="font-mono text-xs text-subtle">55%</span>
+        </div>
+        <ProgressBlock label="Full product" value={55} detail="Phase 3 people foundation is active. Detection, clustering, selection engine, polish, and production hardening remain." />
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-subtle">
+          <div className="rounded-2xl border border-white/8 bg-ink/35 p-3">
+            <p className="font-mono text-text">10%</p>
+            <p className="mt-1">Phase</p>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-ink/35 p-3">
+            <p className="font-mono text-success">Local</p>
+            <p className="mt-1">Privacy</p>
+          </div>
+        </div>
       </div>
     </div>
   );
 
   const topbar = (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 3 people intelligence</p>
-        <h2 className="mt-2 text-3xl font-semibold text-text">People readiness, technical quality, and first-pass ranking</h2>
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill tone="accent">Phase 3 people intelligence</StatusPill>
+          <StatusPill tone="success">Offline-first</StatusPill>
+        </div>
+        <h2 className="mt-2 truncate text-2xl font-semibold tracking-[-0.04em] text-text lg:text-3xl">
+          {currentProject ? currentProject.name : "Premium local photo curation"}
+        </h2>
       </div>
-      <CreateProject onCreate={handleCreateProject} />
+      <div className="flex flex-1 items-center justify-end gap-3">
+        <div className="hidden min-w-[240px] max-w-md flex-1 items-center gap-3 rounded-full border border-white/10 bg-ink/40 px-4 py-2.5 text-sm text-subtle lg:flex">
+          <Search className="h-4 w-4" />
+          <span>Search projects, photos, people...</span>
+        </div>
+        <LumozaButton variant="ghost" className="hidden px-3 lg:inline-flex">
+          <Cpu className="h-4 w-4" />
+          AI packs
+        </LumozaButton>
+        <LumozaButton variant="ghost" className="hidden px-3 lg:inline-flex">
+          <ShieldCheck className="h-4 w-4" />
+          Local
+        </LumozaButton>
+        <LumozaButton type="button" variant="primary" className="hidden xl:inline-flex" onClick={() => setCurrentView("dashboard")}>
+          <Sparkles className="h-4 w-4" />
+          New project
+        </LumozaButton>
+      </div>
     </div>
   );
 
-  let content = <ProjectDashboard projects={projects} onOpenProject={handleOpenProject} />;
+  let content = <ProjectDashboard projects={projects} onOpenProject={handleOpenProject} onCreateProject={handleCreateProject} />;
 
   if (currentView === "workspace" && currentProject) {
     content = (

@@ -8,12 +8,12 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current full product progress: 53%
+Current full product progress: 55%
 Current active phase progress: 10% (Phase 3)
 
 Phase 1 status: 100% complete, including native Rust/Tauri compile and macOS app bundle validation.
 Phase 2 status: 100% complete, with technical-quality scoring, connected-component duplicate grouping, burst grouping, grouping audit summaries, ranking confidence, project-wide album shortlist, review queue queries, and focused Rust tests in place.
-Phase 3 status: 10% complete, with face/people persistence schema, summary plumbing, sidecar contracts, and readiness UI started.
+Phase 3 status: 10% complete, with face/people persistence schema, summary plumbing, sidecar contracts, and readiness UI started. Cross-cutting premium UI redesign foundation is now active across the current product surfaces.
 
 Immediate repo priorities:
 
@@ -25,7 +25,7 @@ Immediate repo priorities:
 
 Full product progress is tracked separately from phase completion.
 
-Current weighted estimate: `53%` overall.
+Current weighted estimate: `55%` overall.
 
 Basis:
 - Phase 1 foundation: `100%` complete

@@ -80,10 +80,10 @@ export function ProjectWorkspace({
   return (
     <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
       <section className="grid gap-5">
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+        <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-muted">Project Workspace</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Project Workspace</p>
               <h2 className="mt-2 text-3xl font-semibold text-text">{project.name}</h2>
               <p className="mt-3 text-sm text-muted">{project.rootFolder}</p>
             </div>
@@ -105,8 +105,8 @@ export function ProjectWorkspace({
 
       <section className="grid gap-5">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Analysis and ranking</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Analysis and ranking</p>
           <p className="mt-3 text-sm leading-7 text-muted">
             {analysisTask
               ? analysisTask.message
@@ -157,8 +157,8 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">People intelligence</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">People intelligence</p>
           <p className="mt-3 text-sm leading-7 text-muted">
             Phase 3 schema and summary plumbing are ready. Real face detection and clustering will populate this panel in the next intelligence slice.
           </p>
@@ -181,17 +181,17 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Group audit</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Group audit</p>
           <div className="mt-4 grid gap-4 text-sm text-muted">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-subtle">Duplicate clusters</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-subtle">Duplicate clusters</p>
               <div className="mt-3 space-y-2">
                 {visibleDuplicateGroups.length === 0 ? (
                   <p className="text-sm leading-7 text-muted">Duplicate clusters will appear after analysis.</p>
                 ) : (
                   visibleDuplicateGroups.map((group) => (
-                    <div key={group.groupId} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3">
+                    <div key={group.groupId} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
                         <span className="text-warning">{group.memberCount} frames</span>
@@ -203,13 +203,13 @@ export function ProjectWorkspace({
               </div>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-subtle">Burst clusters</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-subtle">Burst clusters</p>
               <div className="mt-3 space-y-2">
                 {visibleBurstGroups.length === 0 ? (
                   <p className="text-sm leading-7 text-muted">Burst clusters will appear after analysis.</p>
                 ) : (
                   visibleBurstGroups.map((group) => (
-                    <div key={group.groupId} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3">
+                    <div key={group.groupId} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
                         <span className="text-accent">{group.memberCount} frames</span>
@@ -222,14 +222,14 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Album shortlist</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Album shortlist</p>
           <div className="mt-4 space-y-3">
             {visibleAlbumCandidates.length === 0 ? (
               <p className="text-sm leading-7 text-muted">Run analysis to surface high-confidence keep picks for album review.</p>
             ) : (
               visibleAlbumCandidates.map((photo) => (
-                <div key={photo.id} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3 text-sm">
+                <div key={photo.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate text-text">{photo.filename}</span>
                     <span className="text-accent">{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)}%` : "candidate"}</span>
@@ -240,14 +240,14 @@ export function ProjectWorkspace({
             )}
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Review queue</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Review queue</p>
           <div className="mt-4 space-y-3">
             {visibleReviewQueue.length === 0 ? (
               <p className="text-sm leading-7 text-muted">Ambiguous ranking decisions will appear here after analysis.</p>
             ) : (
               visibleReviewQueue.map((photo) => (
-                <div key={photo.id} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3 text-sm">
+                <div key={photo.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate text-text">{photo.filename}</span>
                     <span className="text-warning">{photo.selectionLabel ?? "review"}</span>
@@ -258,8 +258,8 @@ export function ProjectWorkspace({
             )}
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">{thumbnailSummary.title}</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">{thumbnailSummary.title}</p>
           <p className="mt-3 text-sm leading-7 text-muted">{thumbnailSummary.detail}</p>
           <div className="mt-4 grid gap-2 text-sm text-muted">
             <div className="flex items-center justify-between">
@@ -272,14 +272,14 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
-        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Activity log</p>
+        <div className="lumoza-card rounded-[28px] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Activity log</p>
           <div className="mt-4 space-y-3">
             {activity.length === 0 ? (
               <p className="text-sm text-subtle">No activity entries yet.</p>
             ) : (
               activity.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3">
+                <div key={item.id} className="rounded-[20px] border border-white/8 bg-ink/35 px-4 py-3">
                   <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="text-text">{item.message}</span>
                     <span className="text-subtle">{new Date(item.createdAt).toLocaleTimeString()}</span>

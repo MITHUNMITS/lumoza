@@ -1,7 +1,12 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { Grid3X3, Layers3 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ProjectPhoto } from "../../types/project";
+import { EmptyState } from "../ui/EmptyState";
+import { SkeletonLoader } from "../ui/SkeletonLoader";
+import { StatusPill } from "../ui/StatusPill";
+import { ThumbnailCard } from "../ui/ThumbnailCard";
 
 interface ProjectPhotoGridProps {
   photos: ProjectPhoto[];
@@ -12,21 +17,11 @@ interface ProjectPhotoGridProps {
   onLoadMore: () => void;
 }
 
-const GRID_GAP = 16;
-const CARD_MIN_WIDTH = 210;
-const CARD_HEIGHT = 314;
-const PREVIEW_HEIGHT = 220;
+const GRID_GAP = 18;
+const CARD_MIN_WIDTH = 218;
+const CARD_HEIGHT = 326;
+const PREVIEW_HEIGHT = 226;
 const OVERSCAN_ROWS = 2;
-
-function formatSize(bytes: number) {
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  if (bytes >= 1024) {
-    return `${Math.round(bytes / 1024)} KB`;
-  }
-  return `${bytes} B`;
-}
 
 function hasTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -37,16 +32,16 @@ function createMockPreview(photo: ProjectPhoto) {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
       <defs>
         <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#23414f" />
-          <stop offset="50%" stop-color="#456b70" />
-          <stop offset="100%" stop-color="#0f171b" />
+          <stop offset="0%" stop-color="#223247" />
+          <stop offset="50%" stop-color="#3f5268" />
+          <stop offset="100%" stop-color="#10141b" />
         </linearGradient>
       </defs>
       <rect width="640" height="800" fill="url(#g)" />
       <circle cx="500" cy="172" r="112" fill="rgba(255,255,255,0.14)" />
       <path d="M90 620L240 420L350 550L430 470L550 640V710H90Z" fill="rgba(255,255,255,0.18)" />
-      <text x="90" y="118" fill="rgba(255,255,255,0.88)" font-family="Arial, sans-serif" font-size="38">${photo.extension.toUpperCase()}</text>
-      <text x="90" y="702" fill="rgba(255,255,255,0.74)" font-family="Arial, sans-serif" font-size="24">${photo.filename}</text>
+      <text x="90" y="118" fill="rgba(255,255,255,0.88)" font-family="Inter, sans-serif" font-size="38">${photo.extension.toUpperCase()}</text>
+      <text x="90" y="702" fill="rgba(255,255,255,0.74)" font-family="Inter, sans-serif" font-size="24">${photo.filename}</text>
     </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -61,21 +56,12 @@ function resolvePreviewSrc(photo: ProjectPhoto) {
   return createMockPreview(photo);
 }
 
-function emptyState(isLoading: boolean, error?: string, hasPhotos?: boolean) {
-  if (isLoading) {
-    return <div className="rounded-[20px] border border-dashed border-white/10 bg-ink/30 p-6 text-sm text-muted">Loading indexed project photos...</div>;
-  }
-  if (error) {
-    return <div className="rounded-[20px] border border-danger/30 bg-danger/10 p-6 text-sm text-danger">{error}</div>;
-  }
-  if (!hasPhotos) {
-    return (
-      <div className="rounded-[20px] border border-dashed border-white/10 bg-ink/30 p-6 text-sm text-muted">
-        No indexed photos yet. Run the scan to populate this workspace.
-      </div>
-    );
-  }
-  return null;
+function LoadingGrid() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-5">
+      {Array.from({ length: 10 }, (_, index) => <SkeletonLoader key={index} className="h-[326px]" />)}
+    </div>
+  );
 }
 
 export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, error, onLoadMore }: ProjectPhotoGridProps) {
@@ -99,10 +85,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
 
     updateMetrics();
 
-    const handleScroll = () => {
-      setScrollTop(node.scrollTop);
-    };
-
+    const handleScroll = () => setScrollTop(node.scrollTop);
     node.addEventListener("scroll", handleScroll);
     const observer = new ResizeObserver(updateMetrics);
     observer.observe(node);
@@ -157,117 +140,60 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
     }
   }
 
-  const state = emptyState(isLoading, error, photos.length > 0);
-
   return (
-    <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-      <div className="mb-5 flex items-center justify-between gap-4">
+    <section className="lumoza-card rounded-[30px] p-5">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-[0.22em] text-muted">Photos</p>
-          <h3 className="mt-2 text-xl font-semibold text-text">Indexed project media</h3>
+          <div className="flex items-center gap-3 text-accent">
+            <Grid3X3 className="h-5 w-5" />
+            <p className="text-xs font-semibold uppercase tracking-[0.24em]">Media grid</p>
+          </div>
+          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">Indexed project media</h3>
         </div>
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted">
-          <span className="rounded-full bg-white/6 px-3 py-1">{photos.length}{hasMore ? "+" : ""} loaded</span>
-          <span className="rounded-full bg-white/6 px-3 py-1">Grouping active</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill tone="muted">{photos.length}{hasMore ? "+" : ""} loaded</StatusPill>
+          <StatusPill tone="accent">Virtualized</StatusPill>
+          <StatusPill tone="purple">AI badges</StatusPill>
         </div>
       </div>
 
-      {state}
+      {isLoading ? <LoadingGrid /> : null}
+      {!isLoading && error ? <EmptyState eyebrow="Grid error" title="Photos could not load" detail={error} /> : null}
+      {!isLoading && !error && photos.length === 0 ? <EmptyState eyebrow="No media" title="No indexed photos yet" detail="Run a scan to populate this workspace with safe cached previews and metadata." /> : null}
 
-      {!state ? (
+      {!isLoading && !error && photos.length > 0 ? (
         <div className="space-y-4">
-          <div className="grid gap-3 rounded-[20px] border border-white/8 bg-ink/30 p-4 text-sm text-muted md:grid-cols-3">
+          <div className="grid gap-3 rounded-[24px] border border-white/8 bg-ink/30 p-4 text-sm text-muted md:grid-cols-3">
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Viewport mode</span>
-              <span className="mt-2 block text-text">Windowed rendering for larger project sets</span>
+              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">Viewport</span>
+              <span className="mt-2 block text-text">Windowed rendering for large projects</span>
             </div>
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Technical analysis</span>
-              <span className="mt-2 block text-text">Scores, duplicate groups, and burst candidates now surface together</span>
+              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">AI layer</span>
+              <span className="mt-2 block text-text">Quality, ranking, duplicate, burst, and future people badges</span>
             </div>
             <div>
-              <span className="block text-xs uppercase tracking-[0.22em] text-subtle">Scroll state</span>
-              <span className="mt-2 block text-text">{isLoadingMore ? "Loading more indexed media..." : hasMore ? "More records will load near the bottom" : "All loaded records are currently in memory"}</span>
+              <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-subtle">Loading</span>
+              <span className="mt-2 block text-text">{isLoadingMore ? "Loading more media..." : hasMore ? "More loads near the bottom" : "All loaded records visible"}</span>
             </div>
           </div>
 
-          <div ref={viewportRef} className="relative h-[760px] overflow-y-auto rounded-[20px] border border-white/8 bg-ink/30 p-3">
+          <div ref={viewportRef} className="lumoza-scrollbar relative h-[calc(100vh-300px)] min-h-[620px] overflow-y-auto rounded-[26px] border border-white/8 bg-ink/35 p-3">
             <div style={{ height: totalHeight > 0 ? `${totalHeight}px` : `${CARD_HEIGHT}px`, position: "relative" }}>
-              {virtualItems.map(({ photo, style }) => {
-                const previewSrc = resolvePreviewSrc(photo);
-                const overallScore = photo.quality?.overallScore;
-                const rankingScore = photo.rankingScore;
-
-                return (
-                  <article key={photo.id} style={{ ...style, height: `${CARD_HEIGHT}px` }} className="flex flex-col overflow-hidden rounded-[20px] border border-white/8 bg-panel/80 shadow-soft">
-                    <div className="relative bg-gradient-to-br from-white/10 via-white/5 to-transparent" style={{ height: `${PREVIEW_HEIGHT}px` }}>
-                      <div className="absolute left-3 top-3 flex flex-wrap gap-2 z-10">
-                        {overallScore !== undefined ? (
-                          <span className="rounded-full bg-ink/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-                            {(overallScore * 100).toFixed(0)} quality
-                          </span>
-                        ) : null}
-                        {photo.selectionLabel ? (
-                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${photo.selectionLabel === "keep" ? "bg-accent/18 text-accent" : photo.selectionLabel === "review" ? "bg-white/12 text-text" : "bg-danger/18 text-danger"}`}>
-                            {photo.selectionLabel}
-                          </span>
-                        ) : null}
-                        {photo.confidenceLabel ? (
-                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${photo.confidenceLabel === "high" ? "bg-accent/18 text-accent" : photo.confidenceLabel === "medium" ? "bg-warning/15 text-warning" : "bg-white/10 text-subtle"}`}>
-                            {photo.confidenceLabel} confidence
-                          </span>
-                        ) : null}
-                        {photo.albumCandidate ? (
-                          <span className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-text">
-                            album pick
-                          </span>
-                        ) : null}
-                        {photo.duplicateGroupId ? (
-                          <span className="rounded-full bg-warning/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-warning">
-                            duplicate set
-                          </span>
-                        ) : null}
-                        {photo.burstGroupId ? (
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-text">
-                            burst set
-                          </span>
-                        ) : null}
-                      </div>
-                      {previewSrc ? (
-                        <img
-                          src={previewSrc}
-                          alt={photo.filename}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-end rounded-[14px] border border-dashed border-white/8 p-3 text-xs text-subtle">
-                          {photo.thumbnailStatus === "failed" ? "Preview generation failed" : "Thumbnail pending"}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-2 p-3">
-                      <p className="truncate text-sm font-medium text-text">{photo.filename}</p>
-                      <div className="flex items-center justify-between gap-3 text-xs text-subtle">
-                        <span>{photo.width && photo.height ? `${photo.width}×${photo.height}` : "Dimensions pending"}</span>
-                        <span>{formatSize(photo.fileSizeBytes)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 text-xs text-subtle">
-                        <span className="uppercase">{photo.extension}</span>
-                        <span>{photo.modifiedAt ? new Date(photo.modifiedAt).toLocaleDateString() : "Unknown date"}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 text-xs text-subtle">
-                        <span>{photo.selectionReason ?? "Selection reason pending"}</span>
-                        <span>{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)} conf` : rankingScore !== undefined ? `${(rankingScore * 100).toFixed(0)} rank` : "Unranked"}</span>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+              {virtualItems.map(({ photo, style }) => (
+                <ThumbnailCard key={photo.id} photo={photo} previewSrc={resolvePreviewSrc(photo)} style={style} height={CARD_HEIGHT} previewHeight={PREVIEW_HEIGHT} />
+              ))}
             </div>
           </div>
+
+          {isLoadingMore ? (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/8 bg-white/[0.035] px-4 py-3 text-sm text-muted">
+              <Layers3 className="h-4 w-4 animate-pulse text-accent" />
+              Loading more indexed media
+            </div>
+          ) : null}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

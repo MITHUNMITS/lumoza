@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { FolderPlus } from "lucide-react";
+import { LumozaButton } from "../components/ui/LumozaButton";
 import type { CreateProjectInput } from "../types/project";
 
 interface CreateProjectProps {
@@ -27,22 +29,29 @@ export function CreateProject({ onCreate }: CreateProjectProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-[24px] border border-white/8 bg-card/70 p-5">
-      <p className="text-sm uppercase tracking-[0.22em] text-muted">Create Project</p>
-      <h3 className="mt-2 text-xl font-semibold text-text">Start a local curation workspace</h3>
-      <div className="mt-5 grid gap-4">
-        <label className="grid gap-2 text-sm text-muted">
+    <form onSubmit={handleSubmit} className="lumoza-card rounded-[26px] p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-accent/25 bg-accent/10 text-accent">
+          <FolderPlus className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-subtle">New project</p>
+          <h3 className="mt-1 text-base font-semibold text-text">Local workspace</h3>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3">
+        <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-subtle">
           Project name
-          <input value={name} onChange={(event) => setName(event.target.value)} className="rounded-2xl border border-white/10 bg-ink/70 px-4 py-3 text-text outline-none placeholder:text-subtle" placeholder="Dubai Wedding Highlights" />
+          <input value={name} onChange={(event) => setName(event.target.value)} className="lumoza-focus rounded-2xl border border-white/10 bg-ink/65 px-4 py-3 text-sm normal-case tracking-normal text-text outline-none placeholder:text-subtle" placeholder="Dubai Wedding Highlights" />
         </label>
-        <label className="grid gap-2 text-sm text-muted">
+        <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-subtle">
           Root folder
-          <input value={rootFolder} onChange={(event) => setRootFolder(event.target.value)} className="rounded-2xl border border-white/10 bg-ink/70 px-4 py-3 text-text outline-none placeholder:text-subtle" placeholder="/Volumes/Photos/Client-A" />
+          <input value={rootFolder} onChange={(event) => setRootFolder(event.target.value)} className="lumoza-focus rounded-2xl border border-white/10 bg-ink/65 px-4 py-3 text-sm normal-case tracking-normal text-text outline-none placeholder:text-subtle" placeholder="/Volumes/Photos/Client-A" />
         </label>
       </div>
-      <button type="submit" disabled={isSubmitting} className="mt-5 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">
+      <LumozaButton type="submit" disabled={isSubmitting} variant="primary" className="mt-4 w-full">
         {isSubmitting ? "Preparing project..." : "Create project"}
-      </button>
+      </LumozaButton>
     </form>
   );
 }
