@@ -8,6 +8,7 @@ interface ProjectWorkspaceProps {
   project: ProjectSummary;
   photos: ProjectPhoto[];
   albumCandidates: ProjectPhoto[];
+  reviewQueue: ProjectPhoto[];
   analysisSummary?: ProjectAnalysisSummary;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
@@ -37,6 +38,7 @@ export function ProjectWorkspace({
   project,
   photos,
   albumCandidates,
+  reviewQueue,
   analysisSummary,
   isLoadingPhotos,
   isLoadingMorePhotos,
@@ -62,6 +64,7 @@ export function ProjectWorkspace({
   const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
   const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
   const visibleAlbumCandidates = albumCandidates.slice(0, 5);
+  const visibleReviewQueue = reviewQueue.slice(0, 5);
   const analyzedCount = analysisTask?.analyzedCount ?? analysisSummary?.analyzedPhotoCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length;
 
   return (
@@ -155,6 +158,24 @@ export function ProjectWorkspace({
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate text-text">{photo.filename}</span>
                     <span className="text-accent">{photo.confidenceScore !== undefined ? `${(photo.confidenceScore * 100).toFixed(0)}%` : "candidate"}</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-subtle">{photo.selectionReason ?? "Selection reason pending"}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">Review queue</p>
+          <div className="mt-4 space-y-3">
+            {visibleReviewQueue.length === 0 ? (
+              <p className="text-sm leading-7 text-muted">Ambiguous ranking decisions will appear here after analysis.</p>
+            ) : (
+              visibleReviewQueue.map((photo) => (
+                <div key={photo.id} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-text">{photo.filename}</span>
+                    <span className="text-warning">{photo.selectionLabel ?? "review"}</span>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-subtle">{photo.selectionReason ?? "Selection reason pending"}</p>
                 </div>

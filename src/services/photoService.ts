@@ -130,3 +130,18 @@ export async function listAlbumCandidatePhotos(projectId: string, limit = 12): P
   const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_album_candidates", { projectId, limit });
   return photos.map(mapPhoto);
 }
+
+
+export async function listReviewQueuePhotos(projectId: string, limit = 18): Promise<ProjectPhoto[]> {
+  if (!hasTauriRuntime()) {
+    const projects = await listProjects();
+    const project = projects.find((entry) => entry.projectId === projectId);
+    return createMockPhotos(projectId, project?.photoCount ?? 0)
+      .filter((photo) => photo.selectionLabel === "review" || photo.confidenceLabel !== "high")
+      .sort((left, right) => (left.confidenceScore ?? 1) - (right.confidenceScore ?? 1))
+      .slice(0, limit);
+  }
+
+  const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_review_queue", { projectId, limit });
+  return photos.map(mapPhoto);
+}

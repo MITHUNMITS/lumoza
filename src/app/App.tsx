@@ -7,7 +7,7 @@ import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { getProjectAnalysisSummary, getQualityAnalysisTask, startQualityAnalysis } from "../services/analysisService";
-import { listAlbumCandidatePhotos, listProjectPhotos } from "../services/photoService";
+import { listAlbumCandidatePhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
 import { bootstrapApplication, getSystemStatus } from "../services/systemStatusService";
@@ -27,6 +27,7 @@ export function App() {
   const [statusText, setStatusText] = useState("Preparing desktop foundation...");
   const [projectPhotos, setProjectPhotos] = useState<ProjectPhoto[]>([]);
   const [albumCandidates, setAlbumCandidates] = useState<ProjectPhoto[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ProjectPhoto[]>([]);
   const [analysisSummary, setAnalysisSummary] = useState<ProjectAnalysisSummary | undefined>();
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
@@ -96,6 +97,7 @@ export function App() {
     if (!currentProject) {
       setProjectPhotos([]);
       setAlbumCandidates([]);
+      setReviewQueue([]);
       setAnalysisSummary(undefined);
       setIsLoadingMorePhotos(false);
       setHasMorePhotos(false);
@@ -111,14 +113,16 @@ export function App() {
     void Promise.all([
       listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
       listAlbumCandidatePhotos(currentProject.projectId),
+      listReviewQueuePhotos(currentProject.projectId),
       getProjectAnalysisSummary(currentProject.projectId),
     ])
-      .then(([photos, shortlist, summary]) => {
+      .then(([photos, shortlist, reviewItems, summary]) => {
         if (cancelled) {
           return;
         }
         setProjectPhotos(photos);
         setAlbumCandidates(shortlist);
+        setReviewQueue(reviewItems);
         setAnalysisSummary(summary);
         setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
       })
@@ -161,9 +165,10 @@ export function App() {
           }
           setProjects(refreshedProjects);
           openProject(nextTask.projectId);
-          const [refreshedPhotos, refreshedAlbumCandidates, refreshedSummary] = await Promise.all([
+          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedSummary] = await Promise.all([
             listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
             listAlbumCandidatePhotos(nextTask.projectId),
+            listReviewQueuePhotos(nextTask.projectId),
             getProjectAnalysisSummary(nextTask.projectId),
           ]);
           if (cancelled) {
@@ -171,6 +176,7 @@ export function App() {
           }
           setProjectPhotos(refreshedPhotos);
           setAlbumCandidates(refreshedAlbumCandidates);
+          setReviewQueue(refreshedReviewQueue);
           setAnalysisSummary(refreshedSummary);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
@@ -222,9 +228,10 @@ export function App() {
         setActiveAnalysisTask(nextTask);
 
         if (isTerminal(nextTask)) {
-          const [refreshedPhotos, refreshedAlbumCandidates, refreshedSummary] = await Promise.all([
+          const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedSummary] = await Promise.all([
             listProjectPhotos(nextTask.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
             listAlbumCandidatePhotos(nextTask.projectId),
+            listReviewQueuePhotos(nextTask.projectId),
             getProjectAnalysisSummary(nextTask.projectId),
           ]);
           if (cancelled) {
@@ -232,6 +239,7 @@ export function App() {
           }
           setProjectPhotos(refreshedPhotos);
           setAlbumCandidates(refreshedAlbumCandidates);
+          setReviewQueue(refreshedReviewQueue);
           setAnalysisSummary(refreshedSummary);
           setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
           addActivity({
@@ -324,13 +332,15 @@ export function App() {
         const refreshedProjects = await listProjects();
         setProjects(refreshedProjects);
         openProject(currentProject.projectId);
-        const [refreshedPhotos, refreshedAlbumCandidates, refreshedSummary] = await Promise.all([
+        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedSummary] = await Promise.all([
           listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
           listAlbumCandidatePhotos(currentProject.projectId),
+          listReviewQueuePhotos(currentProject.projectId),
           getProjectAnalysisSummary(currentProject.projectId),
         ]);
         setProjectPhotos(refreshedPhotos);
         setAlbumCandidates(refreshedAlbumCandidates);
+        setReviewQueue(refreshedReviewQueue);
         setAnalysisSummary(refreshedSummary);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
@@ -381,13 +391,15 @@ export function App() {
       });
 
       if (isTerminal(task)) {
-        const [refreshedPhotos, refreshedAlbumCandidates, refreshedSummary] = await Promise.all([
+        const [refreshedPhotos, refreshedAlbumCandidates, refreshedReviewQueue, refreshedSummary] = await Promise.all([
           listProjectPhotos(currentProject.projectId, { offset: 0, limit: PHOTO_PAGE_SIZE }),
           listAlbumCandidatePhotos(currentProject.projectId),
+          listReviewQueuePhotos(currentProject.projectId),
           getProjectAnalysisSummary(currentProject.projectId),
         ]);
         setProjectPhotos(refreshedPhotos);
         setAlbumCandidates(refreshedAlbumCandidates);
+        setReviewQueue(refreshedReviewQueue);
         setAnalysisSummary(refreshedSummary);
         setHasMorePhotos(refreshedPhotos.length === PHOTO_PAGE_SIZE);
         addActivity({
@@ -520,10 +532,10 @@ export function App() {
         <button type="button" onClick={() => setCurrentView("settings")} className="rounded-2xl px-4 py-3 text-left hover:bg-white/5">Settings</button>
       </nav>
       <div className="mt-auto rounded-[24px] border border-white/8 bg-card/80 p-4 text-sm text-muted">
-        Full product progress: 43%
-        Current phase progress: 65% (Phase 2)
+        Full product progress: 44%
+        Current phase progress: 68% (Phase 2)
 
-Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping, ranking confidence, and project-wide album shortlist guidance are active, while face intelligence, deeper ranking, polish, and release work still remain.
+Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping, ranking confidence, album shortlist guidance, and review queue guidance are active, while face intelligence, deeper ranking, polish, and release work still remain.
       </div>
     </div>
   );
@@ -546,6 +558,7 @@ Phase 2 is in progress. Technical quality scoring, duplicate/burst grouping, ran
         project={currentProject}
         photos={projectPhotos}
         albumCandidates={albumCandidates}
+        reviewQueue={reviewQueue}
         analysisSummary={analysisSummary}
         isLoadingPhotos={isLoadingPhotos}
         isLoadingMorePhotos={isLoadingMorePhotos}

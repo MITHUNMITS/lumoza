@@ -353,6 +353,91 @@ pub fn list_album_candidate_photos(path: &Path, limit: u32) -> anyhow::Result<Ve
     Ok(photos)
 }
 
+
+pub fn list_review_queue_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let safe_limit = limit.clamp(1, 80);
+    let mut statement = connection.prepare(
+        "SELECT
+            photos.id,
+            photos.absolute_path,
+            photos.filename,
+            photos.extension,
+            photos.file_size_bytes,
+            photos.width,
+            photos.height,
+            photos.modified_at,
+            photos.thumbnail_status,
+            thumbnails.cache_path,
+            photo_quality_metrics.sharpness_score,
+            photo_quality_metrics.exposure_score,
+            photo_quality_metrics.contrast_score,
+            photo_quality_metrics.resolution_score,
+            photo_quality_metrics.overall_score,
+            duplicate_groups.id,
+            burst_groups.id,
+            photo_curation_scores.ranking_score,
+            photo_curation_scores.selection_label,
+            photo_curation_scores.selection_reason,
+            photo_curation_recommendations.confidence_score,
+            photo_curation_recommendations.confidence_label,
+            photo_curation_recommendations.album_candidate
+         FROM photos
+         LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
+         LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
+         LEFT JOIN photo_curation_scores ON photo_curation_scores.photo_id = photos.id
+         LEFT JOIN photo_curation_recommendations ON photo_curation_recommendations.photo_id = photos.id
+         LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
+         LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         WHERE photo_curation_scores.selection_label = 'review'
+            OR photo_curation_recommendations.confidence_label IN ('medium', 'low')
+         ORDER BY
+            CASE photo_curation_scores.selection_label WHEN 'review' THEN 0 ELSE 1 END,
+            photo_curation_recommendations.confidence_score ASC,
+            photo_curation_scores.ranking_score DESC,
+            photos.filename ASC
+         LIMIT ?1",
+    )?;
+
+    let rows = statement.query_map(params![safe_limit as i64], |row| {
+        Ok(ProjectPhotoRecord {
+            id: row.get::<_, String>(0)?,
+            absolute_path: row.get::<_, String>(1)?,
+            filename: row.get::<_, String>(2)?,
+            extension: row.get::<_, String>(3)?,
+            file_size_bytes: row.get::<_, i64>(4)? as u64,
+            width: row.get::<_, Option<i64>>(5)?.map(|value| value as u32),
+            height: row.get::<_, Option<i64>>(6)?.map(|value| value as u32),
+            modified_at: row.get::<_, Option<String>>(7)?,
+            thumbnail_status: row.get::<_, String>(8)?,
+            thumbnail_cache_path: row.get::<_, Option<String>>(9)?,
+            sharpness_score: row.get::<_, Option<f64>>(10)?,
+            exposure_score: row.get::<_, Option<f64>>(11)?,
+            contrast_score: row.get::<_, Option<f64>>(12)?,
+            resolution_score: row.get::<_, Option<f64>>(13)?,
+            overall_score: row.get::<_, Option<f64>>(14)?,
+            duplicate_group_id: row.get::<_, Option<String>>(15)?,
+            burst_group_id: row.get::<_, Option<String>>(16)?,
+            ranking_score: row.get::<_, Option<f64>>(17)?,
+            selection_label: row.get::<_, Option<String>>(18)?,
+            selection_reason: row.get::<_, Option<String>>(19)?,
+            confidence_score: row.get::<_, Option<f64>>(20)?,
+            confidence_label: row.get::<_, Option<String>>(21)?,
+            album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+        })
+    })?;
+
+    let mut photos = Vec::new();
+    for row in rows {
+        photos.push(row?);
+    }
+
+    Ok(photos)
+}
+
 pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalysisSummaryRecord> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;

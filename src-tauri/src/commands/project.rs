@@ -179,6 +179,26 @@ pub fn list_project_album_candidates(
     Ok(photos.into_iter().map(map_project_photo_response).collect())
 }
 
+
+#[tauri::command]
+pub fn list_project_review_queue(
+    app: AppHandle,
+    project_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<ProjectPhotoResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let photos = database::list_review_queue_photos(
+        PathBuf::from(&project.project_db_path).as_path(),
+        limit.unwrap_or(18),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(photos.into_iter().map(map_project_photo_response).collect())
+}
+
 #[tauri::command]
 pub fn get_project_analysis_summary(app: AppHandle, project_id: String) -> Result<ProjectAnalysisSummaryResponse, String> {
     let project = project_registry::find_project(&app, &project_id)
