@@ -81,9 +81,9 @@ export function ProjectWorkspace({
   const activeGroups = groupSummaries.slice(0, 4);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
-      <section className="min-w-0 space-y-4">
-        <div className="relative overflow-hidden rounded-[34px] bg-ink/38 p-5 shadow-soft">
+    <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <section className="flex min-w-0 min-h-0 flex-col gap-4">
+        <div className="relative shrink-0 overflow-hidden rounded-[30px] bg-ink/34 p-4 shadow-soft">
           <div className="absolute right-0 top-0 h-28 w-56 rounded-full bg-accent/10 blur-3xl" />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
@@ -91,7 +91,7 @@ export function ProjectWorkspace({
                 <StatusPill tone="accent">Workspace</StatusPill>
                 <StatusPill tone="muted">{photos.length}{hasMorePhotos ? "+" : ""} photos</StatusPill>
               </div>
-              <h2 className="mt-3 truncate text-3xl font-semibold tracking-[-0.05em] text-text">{project.name}</h2>
+              <h2 className="mt-2 truncate text-2xl font-semibold tracking-[-0.05em] text-text">{project.name}</h2>
             </div>
             <div className="flex flex-wrap gap-2">
               <LumozaButton type="button" onClick={onStartAnalysis} variant="secondary"><BrainCircuit className="h-4 w-4" /> Analyze</LumozaButton>
@@ -110,7 +110,7 @@ export function ProjectWorkspace({
         />
       </section>
 
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+      <aside className="lumoza-scrollbar hidden min-h-0 space-y-4 overflow-y-auto pr-1 xl:block">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
 
         <section className="rounded-[30px] bg-white/[0.035] p-5 shadow-soft">

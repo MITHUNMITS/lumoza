@@ -22,11 +22,11 @@ export function SettingsPage() {
   const setShowActivityPanel = useSettingsStore((state) => state.setShowActivityPanel);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+    <div className="lumoza-scrollbar grid h-full min-h-0 gap-5 overflow-y-auto pr-1 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="lumoza-panel rounded-[34px] p-7">
         <StatusPill tone="accent">Preferences</StatusPill>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.055em] text-text">Compact controls for a creative workstation.</h2>
-        <p className="mt-4 text-sm leading-7 text-muted">Settings stay intentionally calm. Future AI model packs, cache control, and performance modes will appear here without turning the app into an admin console.</p>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.055em] text-text">Studio preferences.</h2>
+        <p className="mt-4 text-sm leading-7 text-muted">Keep the workspace quiet, fast, and local.</p>
       </section>
 
       <section className="grid gap-5">

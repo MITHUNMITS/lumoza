@@ -48,3 +48,7 @@ This UI pass redesigns the current Phase 1-3 surfaces and prepares future slots.
 ## Studio Refinement
 
 The second UI refinement reduces visible dashboard patterns: the sidebar is icon-first, the homepage removes metric-card emphasis, project cards become cinematic previews, and the workspace gives the photo grid the dominant surface with a compact AI rail.
+
+## Viewport Workspace Rule
+
+Primary surfaces should use fixed viewport regions instead of full-page scrolling. The app shell owns the window, the central media canvas owns the main focus, and side panels scroll independently as docked inspectors. Avoid stacked webpage composition on dashboard and workspace views.

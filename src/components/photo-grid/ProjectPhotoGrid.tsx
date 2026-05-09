@@ -141,7 +141,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
   }
 
   return (
-    <section className="rounded-[30px] bg-ink/24 p-3 shadow-soft">
+    <section className="flex min-h-0 flex-1 flex-col rounded-[30px] bg-ink/24 p-3 shadow-soft">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-2">
         <div className="flex items-center gap-2 text-muted">
           <Grid3X3 className="h-4 w-4 text-accent" />
@@ -158,8 +158,8 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
       {!isLoading && !error && photos.length === 0 ? <EmptyState eyebrow="No media" title="No indexed photos yet" detail="Run a scan to populate this workspace with safe cached previews and metadata." /> : null}
 
       {!isLoading && !error && photos.length > 0 ? (
-        <div className="space-y-3">
-          <div ref={viewportRef} className="lumoza-scrollbar relative h-[calc(100vh-260px)] min-h-[660px] overflow-y-auto rounded-[26px] bg-ink/30 p-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div ref={viewportRef} className="lumoza-scrollbar relative min-h-0 flex-1 overflow-y-auto rounded-[26px] bg-ink/30 p-3">
             <div style={{ height: totalHeight > 0 ? `${totalHeight}px` : `${CARD_HEIGHT}px`, position: "relative" }}>
               {virtualItems.map(({ photo, style }) => (
                 <ThumbnailCard key={photo.id} photo={photo} previewSrc={resolvePreviewSrc(photo)} style={style} height={CARD_HEIGHT} previewHeight={PREVIEW_HEIGHT} />

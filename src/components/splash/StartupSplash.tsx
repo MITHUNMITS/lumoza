@@ -50,20 +50,20 @@ export function StartupSplash({ steps, error }: StartupSplashProps) {
           <div className="relative">
             <LumozaMark />
             <p className="mt-7 text-xs font-semibold uppercase tracking-[0.42em] text-accent/90">Lumoza Studio</p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-text md:text-5xl">Preparing AI Engine</h1>
+            <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-text md:text-5xl">Preparing memories</h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted">
-              Initializing the local-first creative workspace. Originals stay read-only, processing stays on this machine.
+              Building a quiet local workspace for your photos.
             </p>
 
             <div className="mx-auto mt-8 max-w-xl rounded-[26px] border border-white/8 bg-ink/35 p-5 text-left">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-text">{activeStep?.label ?? "Bootstrap"}</p>
-                  <p className="mt-1 text-sm text-muted">{activeStep?.detail ?? "Starting local services..."}</p>
+                  <p className="text-sm font-medium text-text">{activeStep?.label ?? "Workspace"}</p>
+                  <p className="mt-1 text-sm text-muted">{activeStep?.detail ?? "Preparing workspace..."}</p>
                 </div>
                 <StatusPill tone={error ? "danger" : "accent"}>{error ? "Blocked" : "Local"}</StatusPill>
               </div>
-              <ProgressBlock label="Startup progress" value={error ? 100 : progress} detail="Loading registry, SQLite, project cache, and local engine contracts." />
+              <ProgressBlock label="Preparing workspace" value={error ? 100 : progress} detail="Quietly organizing the local studio." />
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-3">

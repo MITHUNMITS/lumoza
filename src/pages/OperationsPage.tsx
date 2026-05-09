@@ -30,19 +30,19 @@ function statusTone(status?: SystemStatus) {
 
 function systemSummary(status?: SystemStatus) {
   if (!status) {
-    return "System status has not been loaded yet.";
+    return "Workspace health is still waking up.";
   }
   if (status.sqlite !== "ready") {
-    return "SQLite foundation needs attention before scans can be trusted.";
+    return "Local library storage needs attention before curation can continue.";
   }
   if (status.registry !== "ready") {
-    return "Project registry is not healthy enough for multi-project stability.";
+    return "Project list needs attention before switching memories.";
   }
   if (status.pythonSidecar === "offline") {
     return "Desktop foundation is healthy, but the Python sidecar is offline.";
   }
   if (status.pythonSidecar === "placeholder") {
-    return "Desktop foundation is healthy. Python sidecar exposes the Phase 3 people-intelligence contract while native analysis remains local-first.";
+    return "Local workspace is ready. People intelligence is prepared for the next curation pass.";
   }
   return "Desktop foundation is healthy and all monitored services currently report ready.";
 }
@@ -82,8 +82,8 @@ export function OperationsPage({
   const photosWithFacesCount = peopleSummary?.photosWithFacesCount ?? 0;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-      <section className="grid gap-5">
+    <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="lumoza-scrollbar grid min-h-0 gap-5 overflow-y-auto pr-1">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="lumoza-card rounded-[28px] p-5">
             <div className="flex items-center gap-3 text-accent">
@@ -148,7 +148,7 @@ export function OperationsPage({
         </div>
       </section>
 
-      <section className="grid gap-5">
+      <section className="lumoza-scrollbar grid min-h-0 gap-5 overflow-y-auto pr-1">
         <div className="lumoza-card rounded-[28px] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>

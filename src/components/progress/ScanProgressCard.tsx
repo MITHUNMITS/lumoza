@@ -14,7 +14,7 @@ interface ScanProgressCardProps {
 
 export function ScanProgressCard({ task, onPause, onResume, onCancel }: ScanProgressCardProps) {
   if (!task) {
-    return <EmptyState eyebrow="Scan engine" title="No active scan" detail="Start a project scan to index metadata, build thumbnails, and prepare the local intelligence pipeline." />;
+    return <EmptyState eyebrow="Scan engine" title="Nothing scanning" detail="Import memories when you are ready." />;
   }
 
   const percent = task.progressTotal === 0 ? 0 : Math.round((task.progressCurrent / task.progressTotal) * 100);
@@ -31,7 +31,7 @@ export function ScanProgressCard({ task, onPause, onResume, onCancel }: ScanProg
       </div>
 
       <div className="mt-5">
-        <ProgressBlock label="Overall progress" value={percent} detail={`${task.progressCurrent} of ${task.progressTotal} files processed`} />
+        <ProgressBlock label="Curation progress" value={percent} detail={`${task.progressCurrent} of ${task.progressTotal} memories prepared`} />
       </div>
 
       <div className="mt-5 grid gap-3 text-sm text-muted">
@@ -65,7 +65,7 @@ export function ScanProgressCard({ task, onPause, onResume, onCancel }: ScanProg
 
       <div className="mt-4 flex items-center gap-2 text-xs text-subtle">
         <TimerReset className="h-4 w-4" />
-        <span>Dynamic ETA and current-file streaming are reserved for the next scan-progress refinement.</span>
+        <span>ETA and current photo details will settle into this dock as the scan engine matures.</span>
       </div>
     </div>
   );
