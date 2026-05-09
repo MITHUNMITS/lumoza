@@ -52,3 +52,7 @@ The second UI refinement reduces visible dashboard patterns: the sidebar is icon
 ## Viewport Workspace Rule
 
 Primary surfaces should use fixed viewport regions instead of full-page scrolling. The app shell owns the window, the central media canvas owns the main focus, and side panels scroll independently as docked inspectors. Avoid stacked webpage composition on dashboard and workspace views.
+
+## Reference Screenshot Adaptation
+
+The uploaded `layout_images_samples` references define the active visual target: a Lumoza-branded dark shell, purple-accent navigation, cinematic memory previews, modal-based creation/import flows, splash-screen memory collage, and distinct page architecture for Home, All Photos, People, Places, Timeline, Compare, Import, Export, and Settings. Reference screenshots remain untracked and are not shipped as product assets.

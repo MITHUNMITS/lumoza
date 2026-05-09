@@ -1,12 +1,14 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { Activity, Aperture, FolderOpen, Images, Search, Settings, Sparkles } from "lucide-react";
+import { Aperture, CalendarDays, FolderOpen, GitCompare, Images, Map, Search, Settings, Sparkles, Upload, UsersRound, Download } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { LumozaButton } from "../components/ui/LumozaButton";
+import { LumozaLogo } from "../components/ui/LumozaLogo";
 import { StartupSplash } from "../components/splash/StartupSplash";
 import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
+import { StudioPage } from "../pages/StudioPage";
 import { getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, startQualityAnalysis } from "../services/analysisService";
 import { listAlbumCandidatePhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
@@ -544,21 +546,25 @@ export function App() {
   }
 
   const navItems: Array<{ id: typeof currentView; label: string; icon: ComponentType<{ className?: string }> }> = [
-    { id: "dashboard", label: "Projects", icon: FolderOpen },
-    { id: "workspace", label: "Workspace", icon: Images },
-    { id: "operations", label: "Operations", icon: Activity },
+    { id: "dashboard", label: "Home", icon: FolderOpen },
+    { id: "workspace", label: "All Photos", icon: Images },
+    { id: "people", label: "People", icon: UsersRound },
+    { id: "places", label: "Places", icon: Map },
+    { id: "timeline", label: "Timeline", icon: CalendarDays },
+    { id: "compare", label: "Compare", icon: GitCompare },
+    { id: "import", label: "Import", icon: Upload },
+    { id: "export", label: "Export", icon: Download },
+    { id: "operations", label: "System", icon: Aperture },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
   const sidebar = (
-    <div className="flex h-full flex-col items-center gap-4 px-3 py-4">
-      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/[0.055] shadow-glow">
-        <div className="absolute inset-0 rounded-[18px] bg-accent/10 blur-xl" />
-        <Aperture className="relative h-6 w-6 text-accent" />
+    <div className="flex h-full flex-col px-3 py-4">
+      <div className="mb-4 flex justify-center">
+        <LumozaLogo compact />
       </div>
-
-      <nav className="mt-2 grid gap-2">
-        {navItems.map((item) => {
+      <nav className="grid gap-1.5">
+        {navItems.slice(0, 8).map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
           return (
@@ -567,32 +573,33 @@ export function App() {
               type="button"
               title={item.label}
               onClick={() => setCurrentView(item.id)}
-              className={`lumoza-focus flex h-12 w-12 items-center justify-center rounded-[18px] transition duration-200 ease-lz ${
-                isActive
-                  ? "bg-accent/14 text-accent shadow-glow"
-                  : "text-subtle hover:bg-white/[0.055] hover:text-text"
-              }`}
+              className={`lumoza-focus flex h-10 w-10 items-center justify-center rounded-[13px] transition duration-200 ease-lz ${isActive ? "bg-purple/18 text-purple shadow-glow" : "text-subtle hover:bg-white/[0.055] hover:text-text"}`}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-4 w-4" />
             </button>
           );
         })}
       </nav>
-
-      <div className="mt-auto flex flex-col items-center gap-2 rounded-full bg-white/[0.035] p-2 text-[10px] text-subtle">
-        <span className="font-mono text-text">55</span>
-        <span className="h-8 w-px bg-white/10" />
-        <span className="font-mono text-accent">P3</span>
-      </div>
+      <nav className="mt-auto grid gap-1.5">
+        {navItems.slice(8).map((item) => {
+          const Icon = item.icon;
+          const isActive = currentView === item.id;
+          return (
+            <button key={item.id} type="button" title={item.label} onClick={() => setCurrentView(item.id)} className={`lumoza-focus flex h-10 w-10 items-center justify-center rounded-[13px] transition ${isActive ? "bg-purple/18 text-purple" : "text-subtle hover:bg-white/[0.055] hover:text-text"}`}>
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 
   const topbar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">Lumoza Studio</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">{navItems.find((item) => item.id === currentView)?.label ?? "Lumoza"}</p>
         <h2 className="mt-1 truncate text-xl font-semibold tracking-[-0.04em] text-text lg:text-2xl">
-          {currentProject ? currentProject.name : "Memory studio"}
+          {currentProject ? currentProject.name : "Your stories, quietly organized"}
         </h2>
       </div>
       <div className="flex flex-1 items-center justify-end gap-2">
@@ -638,6 +645,18 @@ export function App() {
         onCancel={handleCancelScan}
       />
     );
+  } else if (currentView === "people") {
+    content = <StudioPage mode="people" title="People" subtitle="Recognize familiar faces and protect important memories." project={currentProject} photos={projectPhotos} />;
+  } else if (currentView === "places") {
+    content = <StudioPage mode="places" title="Places" subtitle="Memories arranged by where they happened." project={currentProject} photos={projectPhotos} />;
+  } else if (currentView === "timeline") {
+    content = <StudioPage mode="timeline" title="Timeline" subtitle="A calm path through the story." project={currentProject} photos={projectPhotos} />;
+  } else if (currentView === "compare") {
+    content = <StudioPage mode="compare" title="Compare" subtitle="Choose the frame that feels right." project={currentProject} photos={projectPhotos} />;
+  } else if (currentView === "import") {
+    content = <StudioPage mode="import" title="Import Photos" subtitle="Bring memories into this local workspace." project={currentProject} photos={projectPhotos} />;
+  } else if (currentView === "export") {
+    content = <StudioPage mode="export" title="Export" subtitle="Prepare the final collection." project={currentProject} photos={projectPhotos} />;
   } else if (currentView === "operations") {
     content = (
       <OperationsPage

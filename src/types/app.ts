@@ -1,4 +1,4 @@
-export type AppView = "dashboard" | "workspace" | "operations" | "settings";
+export type AppView = "dashboard" | "workspace" | "people" | "places" | "timeline" | "compare" | "import" | "export" | "operations" | "settings";
 
 export type SetupStepStatus = "pending" | "running" | "done" | "error";
 
