@@ -1,7 +1,7 @@
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { getThumbnailPipelineSummary } from "../services/thumbnailService";
-import type { ProjectAnalysisSummary, ProjectPhoto, ProjectSummary } from "../types/project";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPhoto, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
 
 interface ProjectWorkspaceProps {
@@ -9,6 +9,7 @@ interface ProjectWorkspaceProps {
   photos: ProjectPhoto[];
   albumCandidates: ProjectPhoto[];
   reviewQueue: ProjectPhoto[];
+  groupSummaries: CurationGroupSummary[];
   analysisSummary?: ProjectAnalysisSummary;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
@@ -39,6 +40,7 @@ export function ProjectWorkspace({
   photos,
   albumCandidates,
   reviewQueue,
+  groupSummaries,
   analysisSummary,
   isLoadingPhotos,
   isLoadingMorePhotos,
@@ -65,6 +67,8 @@ export function ProjectWorkspace({
   const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
   const visibleAlbumCandidates = albumCandidates.slice(0, 5);
   const visibleReviewQueue = reviewQueue.slice(0, 5);
+  const visibleDuplicateGroups = groupSummaries.filter((group) => group.groupingType === "duplicate").slice(0, 3);
+  const visibleBurstGroups = groupSummaries.filter((group) => group.groupingType === "burst").slice(0, 3);
   const analyzedCount = analysisTask?.analyzedCount ?? analysisSummary?.analyzedPhotoCount ?? photos.filter((photo) => photo.quality?.overallScore !== undefined).length;
 
   return (
@@ -144,6 +148,47 @@ export function ProjectWorkspace({
             <div className="flex items-center justify-between">
               <span>Analysis failures</span>
               <span className="text-text">{analysisTask?.failedCount ?? 0}</span>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">Group audit</p>
+          <div className="mt-4 grid gap-4 text-sm text-muted">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-subtle">Duplicate clusters</p>
+              <div className="mt-3 space-y-2">
+                {visibleDuplicateGroups.length === 0 ? (
+                  <p className="text-sm leading-7 text-muted">Duplicate clusters will appear after analysis.</p>
+                ) : (
+                  visibleDuplicateGroups.map((group) => (
+                    <div key={group.groupId} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
+                        <span className="text-warning">{group.memberCount} frames</span>
+                      </div>
+                      <p className="mt-2 text-xs text-subtle">{group.averageSimilarity !== undefined ? `${(group.averageSimilarity * 100).toFixed(0)}% average similarity` : "Similarity pending"}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-subtle">Burst clusters</p>
+              <div className="mt-3 space-y-2">
+                {visibleBurstGroups.length === 0 ? (
+                  <p className="text-sm leading-7 text-muted">Burst clusters will appear after analysis.</p>
+                ) : (
+                  visibleBurstGroups.map((group) => (
+                    <div key={group.groupId} className="rounded-2xl border border-white/8 bg-ink/30 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-text">{group.bestFilename ?? group.groupId}</span>
+                        <span className="text-accent">{group.memberCount} frames</span>
+                      </div>
+                      <p className="mt-2 text-xs text-subtle">{group.averageSimilarity !== undefined ? `${(group.averageSimilarity * 100).toFixed(0)}% average similarity` : "Similarity pending"}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

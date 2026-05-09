@@ -1,5 +1,5 @@
 import { invokeOrMock } from "./tauriCommands";
-import type { ProjectAnalysisSummary } from "../types/project";
+import type { CurationGroupSummary, ProjectAnalysisSummary } from "../types/project";
 import type { QualityAnalysisTask } from "../types/system";
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -67,4 +67,23 @@ export async function getProjectAnalysisSummary(projectId: string): Promise<Proj
   }
 
   return invokeOrMock<ProjectAnalysisSummary>("get_project_analysis_summary", { projectId });
+}
+
+
+function createMockGroupSummaries(): CurationGroupSummary[] {
+  return [
+    { groupId: "duplicate:mock:1", groupingType: "duplicate", memberCount: 4, bestFilename: "photo-0008.jpg", averageSimilarity: 0.94 },
+    { groupId: "duplicate:mock:2", groupingType: "duplicate", memberCount: 3, bestFilename: "photo-0021.jpg", averageSimilarity: 0.91 },
+    { groupId: "burst:mock:1", groupingType: "burst", memberCount: 6, bestFilename: "photo-0034.jpg", averageSimilarity: 0.82 },
+    { groupId: "burst:mock:2", groupingType: "burst", memberCount: 5, bestFilename: "photo-0042.jpg", averageSimilarity: 0.79 },
+  ];
+}
+
+export async function listProjectGroupSummaries(projectId: string, limit = 24): Promise<CurationGroupSummary[]> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return createMockGroupSummaries().slice(0, limit);
+  }
+
+  return invokeOrMock<CurationGroupSummary[]>("list_project_group_summaries", { projectId, limit }, []);
 }

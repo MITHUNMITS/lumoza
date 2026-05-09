@@ -57,6 +57,15 @@ export interface ProjectPhoto {
   albumCandidate: boolean;
 }
 
+export interface CurationGroupSummary {
+  groupId: string;
+  groupingType: "duplicate" | "burst";
+  memberCount: number;
+  bestPhotoId?: string;
+  bestFilename?: string;
+  averageSimilarity?: number;
+}
+
 export interface CreateProjectInput {
   name: string;
   rootFolder: string;

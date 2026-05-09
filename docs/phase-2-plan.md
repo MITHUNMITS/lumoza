@@ -6,11 +6,11 @@ Deliver the first real intelligence layer for Lumoza Studio: fast technical-qual
 
 Current phase status: in progress
 
-Phase 2 progress: 68% complete
-Phase 2 slice progress: technical quality scoring complete, duplicate and burst grouping active, ranking confidence, project-wide album shortlist, and review queue queries active
-Full product progress: 44% overall
+Phase 2 progress: 70% complete
+Phase 2 slice progress: technical quality scoring complete, duplicate and burst grouping active, grouping audit summaries active, ranking confidence, project-wide album shortlist, and review queue queries active
+Full product progress: 45% overall
 
-Duplicate and burst grouping now persist into the Phase 2 analysis model, and ranking now produces keep, review, reject, confidence, album shortlist, and review queue recommendations with project-wide query paths.
+Duplicate and burst grouping now persist into the Phase 2 analysis model with queryable group summaries, and ranking now produces keep, review, reject, confidence, album shortlist, and review queue recommendations with project-wide query paths.
 
 ## Phase 2 Deliverables
 
@@ -62,7 +62,7 @@ Duplicate and burst grouping now persist into the Phase 2 analysis model, and ra
 
 - Refine duplicate grouping beyond the first deterministic pass
 - Refine burst grouping beyond the first deterministic pass
-- Validate ranking confidence, shortlist quality, and review queue quality against larger real projects
+- Validate grouping quality, ranking confidence, shortlist quality, and review queue quality against larger real projects
 
 ## Acceptance Criteria For The First Phase 2 Slice
 

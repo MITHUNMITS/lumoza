@@ -23,6 +23,7 @@ pub fn run() {
             commands::project::list_project_photos,
             commands::project::list_project_album_candidates,
             commands::project::list_project_review_queue,
+            commands::project::list_project_group_summaries,
             commands::project::get_project_analysis_summary,
             commands::project::initialize_project_database,
             commands::scan::start_scan,

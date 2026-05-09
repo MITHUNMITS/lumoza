@@ -66,6 +66,16 @@ pub struct ProjectAnalysisSummaryRecord {
     pub album_candidate_count: u64,
 }
 
+#[derive(Debug)]
+pub struct CurationGroupSummaryRecord {
+    pub group_id: String,
+    pub grouping_type: String,
+    pub member_count: u64,
+    pub best_photo_id: Option<String>,
+    pub best_filename: Option<String>,
+    pub average_similarity: Option<f64>,
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisPhotoRecord {
     pub photo_id: String,
@@ -436,6 +446,51 @@ pub fn list_review_queue_photos(path: &Path, limit: u32) -> anyhow::Result<Vec<P
     }
 
     Ok(photos)
+}
+
+
+pub fn list_curation_group_summaries(path: &Path, limit: u32) -> anyhow::Result<Vec<CurationGroupSummaryRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let safe_limit = limit.clamp(1, 80);
+    let mut statement = connection.prepare(
+        "SELECT
+            duplicate_groups.id,
+            duplicate_groups.grouping_type,
+            COUNT(group_members.photo_id) AS member_count,
+            best_member.photo_id,
+            photos.filename,
+            AVG(group_members.similarity_score)
+         FROM duplicate_groups
+         JOIN duplicate_group_members AS group_members ON group_members.group_id = duplicate_groups.id
+         LEFT JOIN duplicate_group_members AS best_member ON best_member.group_id = duplicate_groups.id AND best_member.rank_order = 0
+         LEFT JOIN photos ON photos.id = best_member.photo_id
+         GROUP BY duplicate_groups.id, duplicate_groups.grouping_type, best_member.photo_id, photos.filename
+         ORDER BY
+            CASE duplicate_groups.grouping_type WHEN 'duplicate' THEN 0 ELSE 1 END,
+            member_count DESC,
+            AVG(group_members.similarity_score) DESC,
+            photos.filename ASC
+         LIMIT ?1",
+    )?;
+
+    let rows = statement.query_map(params![safe_limit as i64], |row| {
+        Ok(CurationGroupSummaryRecord {
+            group_id: row.get::<_, String>(0)?,
+            grouping_type: row.get::<_, String>(1)?,
+            member_count: row.get::<_, i64>(2)? as u64,
+            best_photo_id: row.get::<_, Option<String>>(3)?,
+            best_filename: row.get::<_, Option<String>>(4)?,
+            average_similarity: row.get::<_, Option<f64>>(5)?,
+        })
+    })?;
+
+    let mut groups = Vec::new();
+    for row in rows {
+        groups.push(row?);
+    }
+
+    Ok(groups)
 }
 
 pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalysisSummaryRecord> {

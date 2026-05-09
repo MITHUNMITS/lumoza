@@ -70,6 +70,17 @@ pub struct ProjectAnalysisSummaryResponse {
     pub album_candidate_count: u64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurationGroupSummaryResponse {
+    pub group_id: String,
+    pub grouping_type: String,
+    pub member_count: u64,
+    pub best_photo_id: Option<String>,
+    pub best_filename: Option<String>,
+    pub average_similarity: Option<f64>,
+}
+
 
 fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPhotoResponse {
     ProjectPhotoResponse {
@@ -197,6 +208,36 @@ pub fn list_project_review_queue(
     .map_err(|error| error.to_string())?;
 
     Ok(photos.into_iter().map(map_project_photo_response).collect())
+}
+
+
+#[tauri::command]
+pub fn list_project_group_summaries(
+    app: AppHandle,
+    project_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<CurationGroupSummaryResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let groups = database::list_curation_group_summaries(
+        PathBuf::from(&project.project_db_path).as_path(),
+        limit.unwrap_or(24),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(groups
+        .into_iter()
+        .map(|group| CurationGroupSummaryResponse {
+            group_id: group.group_id,
+            grouping_type: group.grouping_type,
+            member_count: group.member_count,
+            best_photo_id: group.best_photo_id,
+            best_filename: group.best_filename,
+            average_similarity: group.average_similarity,
+        })
+        .collect())
 }
 
 #[tauri::command]
