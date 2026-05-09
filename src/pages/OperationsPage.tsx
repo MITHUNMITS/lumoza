@@ -1,10 +1,11 @@
 import { Activity, AlertTriangle, BrainCircuit, Layers3, RefreshCcw, Server, ShieldCheck } from "lucide-react";
-import type { ProjectAnalysisSummary, ProjectSummary } from "../types/project";
+import type { ProjectAnalysisSummary, ProjectPeopleSummary, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
 
 interface OperationsPageProps {
   currentProject?: ProjectSummary;
   analysisSummary?: ProjectAnalysisSummary;
+  peopleSummary?: ProjectPeopleSummary;
   activity: ActivityItem[];
   task?: ScanTask;
   analysisTask?: QualityAnalysisTask;
@@ -41,7 +42,7 @@ function systemSummary(status?: SystemStatus) {
     return "Desktop foundation is healthy, but the Python sidecar is offline.";
   }
   if (status.pythonSidecar === "placeholder") {
-    return "Desktop foundation is healthy. Python sidecar remains a lightweight capability placeholder while Phase 2 analysis runs locally.";
+    return "Desktop foundation is healthy. Python sidecar exposes the Phase 3 people-intelligence contract while native analysis remains local-first.";
   }
   return "Desktop foundation is healthy and all monitored services currently report ready.";
 }
@@ -53,6 +54,7 @@ function formatEventLabel(eventType: string) {
 export function OperationsPage({
   currentProject,
   analysisSummary,
+  peopleSummary,
   activity,
   task,
   analysisTask,
@@ -72,6 +74,12 @@ export function OperationsPage({
   const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
   const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
   const averageScore = analysisTask?.averageScore ?? analysisSummary?.averageOverallScore ?? 0;
+  const detectedFaceCount = peopleSummary?.detectedFaceCount ?? 0;
+  const clusteredPeopleCount = peopleSummary?.clusteredPeopleCount ?? 0;
+  const namedPeopleCount = peopleSummary?.namedPeopleCount ?? 0;
+  const priorityPeopleCount = peopleSummary?.priorityPeopleCount ?? 0;
+  const unassignedFaceCount = peopleSummary?.unassignedFaceCount ?? 0;
+  const photosWithFacesCount = peopleSummary?.photosWithFacesCount ?? 0;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -91,7 +99,7 @@ export function OperationsPage({
               <p className="text-sm uppercase tracking-[0.22em]">Incidents</p>
             </div>
             <p className="mt-4 text-3xl font-semibold text-text">{incidents.length}</p>
-            <p className="mt-2 text-sm text-muted">Warnings and errors surfaced by scanning, thumbnails, or Phase 2 analysis.</p>
+            <p className="mt-2 text-sm text-muted">Warnings and errors surfaced by scanning, thumbnails, Phase 2 analysis, or Phase 3 people intelligence.</p>
           </div>
           <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
             <div className={`flex items-center gap-3 ${statusTone(systemStatus)}`}>
@@ -211,6 +219,41 @@ export function OperationsPage({
           </div>
         </div>
 
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
+          <div className="flex items-center gap-3 text-accent">
+            <BrainCircuit className="h-5 w-5" />
+            <p className="text-sm uppercase tracking-[0.22em] text-muted">Phase 3 people intelligence</p>
+          </div>
+          <div className="mt-4 grid gap-3 rounded-[20px] border border-white/8 bg-ink/30 p-4 text-sm text-muted">
+            <div className="flex items-center justify-between">
+              <span>Detected faces</span>
+              <span className="text-text">{detectedFaceCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Photos with faces</span>
+              <span className="text-text">{photosWithFacesCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>People clusters</span>
+              <span className="text-text">{clusteredPeopleCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Named people</span>
+              <span className="text-text">{namedPeopleCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Priority people</span>
+              <span className="text-text">{priorityPeopleCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Unassigned faces</span>
+              <span className="text-text">{unassignedFaceCount}</span>
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-7 text-muted">
+            This is the Phase 3 foundation layer: persistence and reporting are ready, while real local detection, embeddings, clustering, and people priority controls remain open.
+          </p>
+        </div>
         <div className="rounded-[24px] border border-white/8 bg-card/70 p-6">
           <div className="flex items-center gap-3 text-accent">
             <BrainCircuit className="h-5 w-5" />

@@ -520,3 +520,10 @@ These are still unresolved and should be fixed before heavy implementation:
 Phase 2 is complete as the first local intelligence layer on top of the Phase 1 photo index. It introduces persisted `analysis_runs`, `photo_quality_metrics`, duplicate/burst group tables, curation scores, confidence labels, album-candidate flags, and query indexes for the fast analysis workflow.
 
 The native analyzer computes sharpness, exposure, contrast, resolution, and overall quality scores, then builds connected-component duplicate groups from perceptual-hash similarity plus file-size proximity. Burst groups use short capture-time windows with filename or visual affinity, and the ranking layer converts those signals into keep, review, reject, confidence, and album-candidate recommendations. Dedicated SQLite queries now support project-wide album shortlist, review queue, and grouping audit retrieval. This remains an intentionally fast local-first pass; face identity and final memory-selection intelligence stay in Phase 3 and Phase 4.
+
+
+## Phase 3 Extension Note
+
+Phase 3 has started with the people-intelligence foundation. The project database now includes face-analysis run tracking, face detections, people clusters, and face-to-person membership tables. Workspace and operations surfaces can query real persisted people-summary counts, while zero-state copy remains explicit that detection and clustering are not implemented yet.
+
+The Python sidecar contract now advertises face detection, people clustering, and people priority capabilities for the upcoming local AI worker. The next architectural decision is the actual detector and embedding runtime; it must remain offline-first, bounded, cache-only for derived crops, and must never mutate original photos.

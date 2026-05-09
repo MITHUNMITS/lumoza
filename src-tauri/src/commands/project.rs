@@ -81,6 +81,18 @@ pub struct CurationGroupSummaryResponse {
     pub average_similarity: Option<f64>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPeopleSummaryResponse {
+    pub face_analysis_run_count: u64,
+    pub detected_face_count: u64,
+    pub clustered_people_count: u64,
+    pub named_people_count: u64,
+    pub priority_people_count: u64,
+    pub unassigned_face_count: u64,
+    pub photos_with_faces_count: u64,
+}
+
 fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPhotoResponse {
     ProjectPhotoResponse {
         id: photo.id,
@@ -260,6 +272,30 @@ pub fn get_project_analysis_summary(
         reject_count: summary.reject_count,
         high_confidence_count: summary.high_confidence_count,
         album_candidate_count: summary.album_candidate_count,
+    })
+}
+
+#[tauri::command]
+pub fn get_project_people_summary(
+    app: AppHandle,
+    project_id: String,
+) -> Result<ProjectPeopleSummaryResponse, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let summary =
+        database::get_project_people_summary(PathBuf::from(&project.project_db_path).as_path())
+            .map_err(|error| error.to_string())?;
+
+    Ok(ProjectPeopleSummaryResponse {
+        face_analysis_run_count: summary.face_analysis_run_count,
+        detected_face_count: summary.detected_face_count,
+        clustered_people_count: summary.clustered_people_count,
+        named_people_count: summary.named_people_count,
+        priority_people_count: summary.priority_people_count,
+        unassigned_face_count: summary.unassigned_face_count,
+        photos_with_faces_count: summary.photos_with_faces_count,
     })
 }
 

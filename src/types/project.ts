@@ -24,6 +24,16 @@ export interface ProjectAnalysisSummary {
   albumCandidateCount: number;
 }
 
+export interface ProjectPeopleSummary {
+  faceAnalysisRunCount: number;
+  detectedFaceCount: number;
+  clusteredPeopleCount: number;
+  namedPeopleCount: number;
+  priorityPeopleCount: number;
+  unassignedFaceCount: number;
+  photosWithFacesCount: number;
+}
+
 export interface ProjectPhotoQualitySummary {
   sharpnessScore?: number;
   exposureScore?: number;

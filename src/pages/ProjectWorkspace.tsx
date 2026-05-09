@@ -1,7 +1,7 @@
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { getThumbnailPipelineSummary } from "../services/thumbnailService";
-import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPhoto, ProjectSummary } from "../types/project";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
 
 interface ProjectWorkspaceProps {
@@ -11,6 +11,7 @@ interface ProjectWorkspaceProps {
   reviewQueue: ProjectPhoto[];
   groupSummaries: CurationGroupSummary[];
   analysisSummary?: ProjectAnalysisSummary;
+  peopleSummary?: ProjectPeopleSummary;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
   hasMorePhotos: boolean;
@@ -42,6 +43,7 @@ export function ProjectWorkspace({
   reviewQueue,
   groupSummaries,
   analysisSummary,
+  peopleSummary,
   isLoadingPhotos,
   isLoadingMorePhotos,
   hasMorePhotos,
@@ -65,6 +67,10 @@ export function ProjectWorkspace({
   const rejectCount = analysisTask?.rejectCount ?? analysisSummary?.rejectCount ?? 0;
   const highConfidenceCount = analysisTask?.highConfidenceCount ?? analysisSummary?.highConfidenceCount ?? 0;
   const albumCandidateCount = analysisTask?.albumCandidateCount ?? analysisSummary?.albumCandidateCount ?? 0;
+  const detectedFaceCount = peopleSummary?.detectedFaceCount ?? 0;
+  const clusteredPeopleCount = peopleSummary?.clusteredPeopleCount ?? 0;
+  const priorityPeopleCount = peopleSummary?.priorityPeopleCount ?? 0;
+  const photosWithFacesCount = peopleSummary?.photosWithFacesCount ?? 0;
   const visibleAlbumCandidates = albumCandidates.slice(0, 5);
   const visibleReviewQueue = reviewQueue.slice(0, 5);
   const visibleDuplicateGroups = groupSummaries.filter((group) => group.groupingType === "duplicate").slice(0, 3);
@@ -148,6 +154,30 @@ export function ProjectWorkspace({
             <div className="flex items-center justify-between">
               <span>Analysis failures</span>
               <span className="text-text">{analysisTask?.failedCount ?? 0}</span>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-[24px] border border-white/8 bg-card/70 p-5">
+          <p className="text-sm uppercase tracking-[0.22em] text-muted">People intelligence</p>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Phase 3 schema and summary plumbing are ready. Real face detection and clustering will populate this panel in the next intelligence slice.
+          </p>
+          <div className="mt-4 grid gap-2 text-sm text-muted">
+            <div className="flex items-center justify-between">
+              <span>Detected faces</span>
+              <span className="text-text">{detectedFaceCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Photos with faces</span>
+              <span className="text-text">{photosWithFacesCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>People clusters</span>
+              <span className="text-text">{clusteredPeopleCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Priority people</span>
+              <span className="text-text">{priorityPeopleCount}</span>
             </div>
           </div>
         </div>

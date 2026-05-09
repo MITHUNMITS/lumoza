@@ -1,5 +1,5 @@
 import { invokeOrMock } from "./tauriCommands";
-import type { CurationGroupSummary, ProjectAnalysisSummary } from "../types/project";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary } from "../types/project";
 import type { QualityAnalysisTask } from "../types/system";
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -67,6 +67,24 @@ export async function getProjectAnalysisSummary(projectId: string): Promise<Proj
   }
 
   return invokeOrMock<ProjectAnalysisSummary>("get_project_analysis_summary", { projectId });
+}
+
+
+export async function getProjectPeopleSummary(projectId: string): Promise<ProjectPeopleSummary> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return {
+      faceAnalysisRunCount: 0,
+      detectedFaceCount: 0,
+      clusteredPeopleCount: 0,
+      namedPeopleCount: 0,
+      priorityPeopleCount: 0,
+      unassignedFaceCount: 0,
+      photosWithFacesCount: 0,
+    };
+  }
+
+  return invokeOrMock<ProjectPeopleSummary>("get_project_people_summary", { projectId });
 }
 
 

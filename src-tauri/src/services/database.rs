@@ -15,11 +15,12 @@ use crate::{
     },
 };
 
-const MIGRATIONS: [&str; 4] = [
+const MIGRATIONS: [&str; 5] = [
     include_str!("../../migrations/0001_init.sql"),
     include_str!("../../migrations/0002_analysis.sql"),
     include_str!("../../migrations/0003_ranking.sql"),
     include_str!("../../migrations/0004_curation_confidence.sql"),
+    include_str!("../../migrations/0005_people.sql"),
 ];
 
 #[derive(Debug)]
@@ -78,6 +79,17 @@ pub struct CurationGroupSummaryRecord {
     pub average_similarity: Option<f64>,
 }
 
+#[derive(Debug)]
+pub struct ProjectPeopleSummaryRecord {
+    pub face_analysis_run_count: u64,
+    pub detected_face_count: u64,
+    pub clustered_people_count: u64,
+    pub named_people_count: u64,
+    pub priority_people_count: u64,
+    pub unassigned_face_count: u64,
+    pub photos_with_faces_count: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisPhotoRecord {
     pub photo_id: String,
@@ -129,6 +141,10 @@ pub fn persist_scan(
     transaction.execute("DELETE FROM photo_curation_recommendations", [])?;
     transaction.execute("DELETE FROM photo_curation_scores", [])?;
     transaction.execute("DELETE FROM photo_quality_metrics", [])?;
+    transaction.execute("DELETE FROM person_faces", [])?;
+    transaction.execute("DELETE FROM people_clusters", [])?;
+    transaction.execute("DELETE FROM face_detections", [])?;
+    transaction.execute("DELETE FROM face_analysis_runs", [])?;
     transaction.execute("DELETE FROM analysis_runs", [])?;
     transaction.execute(
         "DELETE FROM thumbnails WHERE photo_id IN (SELECT id FROM photos WHERE source_folder_id = ?1)",
@@ -579,6 +595,61 @@ pub fn get_project_analysis_summary(path: &Path) -> anyhow::Result<ProjectAnalys
     })
 }
 
+pub fn get_project_people_summary(path: &Path) -> anyhow::Result<ProjectPeopleSummaryRecord> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+
+    let face_analysis_run_count =
+        connection.query_row("SELECT COUNT(*) FROM face_analysis_runs", [], |row| {
+            Ok(row.get::<_, i64>(0)? as u64)
+        })?;
+
+    let detected_face_count =
+        connection.query_row("SELECT COUNT(*) FROM face_detections", [], |row| {
+            Ok(row.get::<_, i64>(0)? as u64)
+        })?;
+
+    let clustered_people_count = connection.query_row(
+        "SELECT COUNT(*) FROM people_clusters WHERE is_hidden = 0",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let named_people_count = connection.query_row(
+        "SELECT COUNT(*) FROM people_clusters WHERE is_hidden = 0 AND display_name IS NOT NULL AND TRIM(display_name) != ''",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let priority_people_count = connection.query_row(
+        "SELECT COUNT(*) FROM people_clusters WHERE is_hidden = 0 AND priority_label != 'unassigned'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let unassigned_face_count = connection.query_row(
+        "SELECT COUNT(*) FROM face_detections WHERE id NOT IN (SELECT face_detection_id FROM person_faces)",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    let photos_with_faces_count = connection.query_row(
+        "SELECT COUNT(DISTINCT photo_id) FROM face_detections",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+
+    Ok(ProjectPeopleSummaryRecord {
+        face_analysis_run_count,
+        detected_face_count,
+        clustered_people_count,
+        named_people_count,
+        priority_people_count,
+        unassigned_face_count,
+        photos_with_faces_count,
+    })
+}
+
 pub fn list_analysis_photo_records(path: &Path) -> anyhow::Result<Vec<AnalysisPhotoRecord>> {
     let connection = open_connection(path)?;
     apply_migrations(&connection, path)?;
@@ -968,4 +1039,90 @@ fn upsert_source_folder(
 
 fn source_folder_id(project_id: &str) -> String {
     format!("source:{project_id}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_db_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "lumoza-{name}-{}-{}.db",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ))
+    }
+
+    fn cleanup_sqlite_files(path: &Path) {
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(path.with_extension("db-wal"));
+        let _ = fs::remove_file(path.with_extension("db-shm"));
+    }
+
+    #[test]
+    fn people_summary_counts_persisted_face_foundation() {
+        let db_path = temp_db_path("people-summary");
+        let connection = open_connection(&db_path).unwrap();
+        apply_migrations(&connection, &db_path).unwrap();
+        let now = Utc::now().to_rfc3339();
+
+        connection
+            .execute(
+                "INSERT INTO source_folders (id, absolute_path, scan_policy, created_at) VALUES ('source:test', '/tmp/source', 'recursive', ?1)",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO photos (id, source_folder_id, absolute_path, filename, extension, file_size_bytes, modified_at, thumbnail_status, ingest_status)
+                 VALUES ('photo:1', 'source:test', '/tmp/source/one.jpg', 'one.jpg', 'jpg', 100, ?1, 'generated', 'indexed'),
+                        ('photo:2', 'source:test', '/tmp/source/two.jpg', 'two.jpg', 'jpg', 100, ?1, 'generated', 'indexed')",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO face_analysis_runs (id, status, engine, engine_version, photos_total, photos_processed, faces_detected, people_clustered, started_at, ended_at)
+                 VALUES ('face-run:1', 'completed', 'test-engine', '0', 2, 2, 3, 1, ?1, ?1)",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO face_detections (id, photo_id, analysis_run_id, bounding_box_x, bounding_box_y, bounding_box_width, bounding_box_height, detection_confidence, quality_score, created_at)
+                 VALUES ('face:1', 'photo:1', 'face-run:1', 0.1, 0.1, 0.2, 0.2, 0.95, 0.88, ?1),
+                        ('face:2', 'photo:1', 'face-run:1', 0.4, 0.1, 0.2, 0.2, 0.91, 0.84, ?1),
+                        ('face:3', 'photo:2', 'face-run:1', 0.2, 0.2, 0.3, 0.3, 0.81, 0.70, ?1)",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO people_clusters (id, display_name, representative_face_id, face_count, photo_count, priority_label, is_hidden, created_at, updated_at)
+                 VALUES ('person:1', 'Maya', 'face:1', 2, 1, 'important', 0, ?1, ?1)",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO person_faces (person_id, face_detection_id, cluster_confidence, is_representative)
+                 VALUES ('person:1', 'face:1', 0.98, 1),
+                        ('person:1', 'face:2', 0.92, 0)",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        let summary = get_project_people_summary(&db_path).unwrap();
+
+        assert_eq!(summary.face_analysis_run_count, 1);
+        assert_eq!(summary.detected_face_count, 3);
+        assert_eq!(summary.clustered_people_count, 1);
+        assert_eq!(summary.named_people_count, 1);
+        assert_eq!(summary.priority_people_count, 1);
+        assert_eq!(summary.unassigned_face_count, 1);
+        assert_eq!(summary.photos_with_faces_count, 2);
+
+        cleanup_sqlite_files(&db_path);
+    }
 }
