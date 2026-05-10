@@ -7,7 +7,7 @@ Build the smart selection engine that turns Phase 2 technical scores and Phase 3
 Current phase status: complete
 
 Phase 4 progress: 100% complete
-Full product progress: 85% overall
+Full product progress: 90% overall
 
 Phase 4 now has the durable selection model, runnable local engine, final/review/rejected browsing, target-count controls, user override controls, event coverage balancing, low-confidence review routing, keyboard review ergonomics, export handoff preview, and persistence/refilter tests.
 

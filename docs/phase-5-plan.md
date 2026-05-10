@@ -6,8 +6,8 @@ Refactor Lumoza Studio into a storyboard-driven professional desktop creative wo
 
 Current phase status: in progress
 
-Phase 5 progress: 35% complete
-Full product progress: 85% overall
+Phase 5 progress: 65% complete
+Full product progress: 90% overall
 
 The primary visual and UX reference is `layout_images_samples/Full_app_pages.png`. The product direction is now one adaptive desktop workspace shell, not a dashboard or multi-page SaaS layout.
 
@@ -20,16 +20,19 @@ The primary visual and UX reference is `layout_images_samples/Full_app_pages.png
 - Added guided workspace creation flow with type selection, source selection, intelligence configuration, and review/create summary
 - Replaced the operations dashboard with a dedicated Media Analysis workflow screen using progress ring, stage rows, live preview strip, and compact system inspector
 - Reworked Settings into a compact storyboard-style settings surface with theme/accent controls and clean package/cache/performance sections
+- Upgraded People Intelligence into a circular cinematic face-cluster workspace with priority badges, merge, split, and naming controls
+- Added Memory Understanding as a visual timeline/moments stage with cinematic memory thumbnails
+- Added Curated Review and Final Curation stage treatments while preserving keyboard review and refilter controls
+- Added Memory Export visual workflow with progress ring, ETA/speed summary, and copy-only safety messaging
+- Added Compare-style review surface and contextual photo-details inspector scaffolding
 
 ## Remaining Phase 5 Work
 
-- Refactor Studio Workspace center/inspector into the exact adaptive workflow model
-- Upgrade People Intelligence to match the circular cinematic face-cluster reference more closely
-- Add Memory Understanding and Intelligent Curation stage layouts with visual timelines and collection summaries
-- Add Curated Review compare/photo-viewer/detail-panel surfaces closer to the storyboard
-- Refine Final Curation and Memory Export visuals without implementing the Phase 6 copy/export runner early
-- Reduce remaining dashboard-like text and boxed sections across secondary views
+- Tighten Studio Workspace center/inspector ergonomics and reduce remaining boxed dashboard feel
+- Add richer modal/detail architecture for photo viewer, compare review, and settings dialogs
+- Refine Intelligent Curation collection summaries against the storyboard reference
 - Add focused UI regression documentation and final build validation
+- Complete final Phase 5 pass without implementing Phase 6 model-download/export-copy behavior early
 
 ## Acceptance Criteria For Phase 5 Completion
 

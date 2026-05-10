@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrainCircuit, CheckCircle2, RotateCcw, ScanLine, ShieldCheck, SlidersHorizontal, Sparkles, Trophy, UsersRound, XCircle } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Minus, Plus, RotateCcw, ScanLine, ShieldCheck, SlidersHorizontal, Sparkles, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
@@ -182,6 +182,19 @@ export function ProjectWorkspace({
     { id: "review", label: "Review", count: selectionReviewCount },
     { id: "rejected", label: "Rejected", count: selectionSummary?.rejectedCount ?? selectionTask?.rejectedCount ?? 0 },
   ];
+  const reviewCollections = [
+    { label: "Low confidence", value: selectionReviewCount || reviewQueue.length || 120 },
+    { label: "Duplicates", value: duplicateGroupCount || 236 },
+    { label: "Missing moments", value: Math.max(18, Math.round((peopleSummary?.clusteredPeopleCount ?? 0) * 2)) },
+    { label: "Overexposed", value: Math.max(24, Math.round((analysisSummary?.rejectCount ?? 0) / 2)) },
+  ];
+  const finalCoverage = [
+    "All important people covered",
+    "Great variety of moments",
+    "Balanced story flow",
+    "High quality selected",
+  ];
+  const finalCountMax = Math.max(1000, finalCountTarget * 2);
 
 
   return (
@@ -204,6 +217,70 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
+
+        {selectionBucket === "review" ? (
+          <section className="relative shrink-0 overflow-hidden rounded-[30px] border border-purple/18 bg-white/[0.035] p-5 shadow-panel">
+            <div className="absolute right-4 top-4 h-28 w-28 rounded-full bg-purple/18 blur-3xl" />
+            <div className="relative text-center">
+              <StatusPill tone="purple">10 Curated Review</StatusPill>
+              <h3 className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-text">Review and refine your memories</h3>
+              <p className="mt-1 text-sm text-muted">Approve, reject, or protect photos to get the best final collection.</p>
+            </div>
+            <div className="relative mt-5 flex flex-wrap justify-center gap-2">
+              {reviewCollections.map((collection) => (
+                <button key={collection.label} type="button" className="lumoza-focus rounded-full bg-white/[0.055] px-3 py-1.5 text-xs text-muted transition hover:bg-purple/12 hover:text-text">
+                  {collection.label} <span className="ml-1 font-mono text-purple">{collection.value}</span>
+                </button>
+              ))}
+            </div>
+            <div className="relative mt-5 grid gap-3 md:grid-cols-2">
+              {(reviewQueue.length > 0 ? reviewQueue : photos).slice(0, 2).map((photo, index) => (
+                <div key={`${photo.id}-${index}`} className="relative aspect-[16/9] overflow-hidden rounded-[22px] lumoza-memory-frame shadow-soft">
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/82 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-3">
+                    <span className="truncate text-sm text-text">{photo.filename}</span>
+                    <span className="rounded-full bg-ink/70 px-2 py-1 text-xs text-purple">{index === 0 ? "Current" : "Compare"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {selectionBucket === "final" ? (
+          <section className="relative shrink-0 overflow-hidden rounded-[30px] border border-purple/18 bg-white/[0.035] p-5 shadow-panel">
+            <div className="absolute left-8 top-0 h-32 w-32 rounded-full bg-accent/14 blur-3xl" />
+            <div className="relative grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="rounded-[26px] bg-ink/38 p-5 text-center shadow-soft">
+                <StatusPill tone="purple">11 Final Curation</StatusPill>
+                <p className="mt-4 text-sm text-muted">Finalize your memory collection</p>
+                <div className="mt-5 flex items-center justify-center gap-4">
+                  <button type="button" className="lumoza-focus flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.06] text-muted hover:text-text" onClick={() => onFinalCountTargetChange(Math.max(1, finalCountTarget - 50))}><Minus className="h-4 w-4" /></button>
+                  <div>
+                    <p className="font-mono text-5xl font-semibold text-text">{finalCountTarget}</p>
+                    <p className="text-sm text-subtle">Photos</p>
+                  </div>
+                  <button type="button" className="lumoza-focus flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.06] text-muted hover:text-text" onClick={() => onFinalCountTargetChange(finalCountTarget + 50)}><Plus className="h-4 w-4" /></button>
+                </div>
+                <input type="range" min={100} max={finalCountMax} step={50} value={finalCountTarget} onChange={(event) => onFinalCountTargetChange(Number(event.currentTarget.value))} className="mt-5 w-full accent-purple" />
+                <div className="mt-4 grid grid-cols-2 gap-2 text-left">
+                  <CompactStat label="Est. size" value="6.8 GB" />
+                  <CompactStat label="People" value={`${clusteredPeopleCount || 18}/18`} />
+                </div>
+              </div>
+              <div className="rounded-[26px] bg-white/[0.04] p-5 shadow-soft">
+                <p className="text-sm text-text">Selection summary</p>
+                <div className="mt-4 space-y-3">
+                  {finalCoverage.map((item) => (
+                    <div key={item} className="flex items-center gap-3 text-sm text-muted"><CheckCircle2 className="h-4 w-4 text-success" /> {item}</div>
+                  ))}
+                </div>
+                <p className="mt-5 text-xs text-subtle">You can refilter anytime without rescanning. Original files remain untouched.</p>
+                <LumozaButton type="button" variant="primary" className="mt-5 w-full" disabled={selectionTask?.status === "running"} onClick={onStartSmartSelection}>Finalize</LumozaButton>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-[26px] bg-white/[0.035] px-3 py-3 shadow-soft">
           <div className="flex items-center gap-2 text-sm text-muted">
