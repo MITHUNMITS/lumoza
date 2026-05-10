@@ -1,8 +1,7 @@
-import { useEffect, useState, type ComponentType } from "react";
-import { Aperture, CalendarDays, FolderOpen, GitCompare, Images, Map, Search, Settings, Sparkles, Upload, UsersRound, Download } from "lucide-react";
-import { AppShell } from "../components/layout/AppShell";
+import { useEffect, useState } from "react";
+import { Aperture, BrainCircuit, CalendarDays, CheckCircle2, Download, Eye, FolderOpen, GitCompare, ScanLine, Search, Settings, Sparkles, Upload, UsersRound } from "lucide-react";
+import { AppShell, type WorkflowStepItem } from "../components/layout/AppShell";
 import { LumozaButton } from "../components/ui/LumozaButton";
-import { LumozaLogo } from "../components/ui/LumozaLogo";
 import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { StartupSplash } from "../components/splash/StartupSplash";
 import { ProjectDashboard } from "../pages/ProjectDashboard";
@@ -23,6 +22,7 @@ import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SmartSelectionT
 
 const PHOTO_PAGE_SIZE = 180;
 type SelectionBucket = "all" | "final" | "review" | "rejected";
+type WorkflowStage = "initialize" | "hub" | "create" | "source" | "configure" | "analyze" | "people" | "understand" | "curate" | "review" | "finalize" | "export";
 
 function isTerminal(task?: ScanTask | QualityAnalysisTask | PeopleAnalysisTask | SmartSelectionTask) {
   return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
@@ -894,59 +894,68 @@ export function App() {
     return <StartupSplash steps={setupSteps.length ? setupSteps : [{ id: "boot", label: "Bootstrap", status: "running", detail: statusText }]} error={bootError} />;
   }
 
-  const navItems: Array<{ id: typeof currentView; label: string; icon: ComponentType<{ className?: string }> }> = [
-    { id: "dashboard", label: "Home", icon: FolderOpen },
-    { id: "workspace", label: "All Photos", icon: Images },
-    { id: "people", label: "People", icon: UsersRound },
-    { id: "places", label: "Places", icon: Map },
-    { id: "timeline", label: "Timeline", icon: CalendarDays },
-    { id: "compare", label: "Compare", icon: GitCompare },
-    { id: "import", label: "Import", icon: Upload },
-    { id: "export", label: "Export", icon: Download },
-    { id: "operations", label: "System", icon: Aperture },
-    { id: "settings", label: "Settings", icon: Settings },
+  const workflowSteps: Array<WorkflowStepItem<WorkflowStage>> = [
+    { id: "initialize", label: "Studio Initialization", shortLabel: "Initialize", icon: Aperture },
+    { id: "hub", label: "Workspace Hub", shortLabel: "Hub", icon: FolderOpen },
+    { id: "create", label: "Workspace Creation", shortLabel: "Create", icon: Sparkles },
+    { id: "source", label: "Media Source", shortLabel: "Source", icon: Upload },
+    { id: "configure", label: "Intelligence Configuration", shortLabel: "Configure", icon: BrainCircuit },
+    { id: "analyze", label: "Media Analysis", shortLabel: "Analyze", icon: ScanLine },
+    { id: "people", label: "People Intelligence", shortLabel: "People", icon: UsersRound },
+    { id: "understand", label: "Memory Understanding", shortLabel: "Understand", icon: CalendarDays },
+    { id: "curate", label: "Intelligent Curation", shortLabel: "Curate", icon: Eye },
+    { id: "review", label: "Curated Review", shortLabel: "Review", icon: GitCompare },
+    { id: "finalize", label: "Final Curation", shortLabel: "Finalize", icon: CheckCircle2 },
+    { id: "export", label: "Memory Export", shortLabel: "Export", icon: Download },
   ];
 
-  const sidebar = (
-    <div className="flex h-full flex-col px-3 py-4">
-      <div className="mb-4 flex justify-center">
-        <LumozaLogo compact />
-      </div>
-      <nav className="grid gap-1.5">
-        {navItems.slice(0, 8).map((item) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              title={item.label}
-              onClick={() => setCurrentView(item.id)}
-              className={`lumoza-focus flex h-10 w-10 items-center justify-center rounded-[13px] transition duration-200 ease-lz ${isActive ? "bg-purple/18 text-purple shadow-glow" : "text-subtle hover:bg-white/[0.055] hover:text-text"}`}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          );
-        })}
-      </nav>
-      <nav className="mt-auto grid gap-1.5">
-        {navItems.slice(8).map((item) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          return (
-            <button key={item.id} type="button" title={item.label} onClick={() => setCurrentView(item.id)} className={`lumoza-focus flex h-10 w-10 items-center justify-center rounded-[13px] transition ${isActive ? "bg-purple/18 text-purple" : "text-subtle hover:bg-white/[0.055] hover:text-text"}`}>
-              <Icon className="h-4 w-4" />
-            </button>
-          );
-        })}
-      </nav>
-    </div>
-  );
+  function workflowStageForView(): WorkflowStage {
+    if (currentView === "dashboard") return "hub";
+    if (currentView === "import") return "source";
+    if (currentView === "operations") return "analyze";
+    if (currentView === "people") return "people";
+    if (currentView === "timeline" || currentView === "places") return "understand";
+    if (currentView === "workspace") return selectionBucket === "final" ? "finalize" : selectionBucket === "review" ? "review" : "curate";
+    if (currentView === "compare") return "review";
+    if (currentView === "export") return "export";
+    return "hub";
+  }
+
+  function handleWorkflowStageChange(stage: WorkflowStage) {
+    if (stage === "initialize") return;
+    if (stage === "hub" || stage === "create" || stage === "configure") {
+      setCurrentView("dashboard");
+    } else if (stage === "source") {
+      setCurrentView("import");
+    } else if (stage === "analyze") {
+      setCurrentView("operations");
+    } else if (stage === "people") {
+      setCurrentView("people");
+    } else if (stage === "understand") {
+      setCurrentView("timeline");
+    } else if (stage === "curate") {
+      setSelectionBucket("all");
+      setCurrentView("workspace");
+    } else if (stage === "review") {
+      setSelectionBucket("review");
+      setCurrentView("workspace");
+      if (currentProject) void handleSelectionBucketChange("review");
+    } else if (stage === "finalize") {
+      setSelectionBucket("final");
+      setCurrentView("workspace");
+      if (currentProject) void handleSelectionBucketChange("final");
+    } else if (stage === "export") {
+      setCurrentView("export");
+    }
+  }
+
+  const activeWorkflowStage = workflowStageForView();
+  const activeWorkflowLabel = workflowSteps.find((step) => step.id === activeWorkflowStage)?.label ?? "Workspace Hub";
 
   const topbar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-subtle">{navItems.find((item) => item.id === currentView)?.label ?? "Lumoza"}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-purple">{String(workflowSteps.findIndex((step) => step.id === activeWorkflowStage) + 1).padStart(2, "0")} {activeWorkflowLabel}</p>
         <h2 className="mt-1 truncate text-xl font-semibold tracking-[-0.04em] text-text lg:text-2xl">
           {currentProject ? currentProject.name : "Your stories, quietly organized"}
         </h2>
@@ -954,14 +963,14 @@ export function App() {
       <div className="flex flex-1 items-center justify-end gap-2">
         <div className="hidden min-w-[220px] max-w-sm flex-1 items-center gap-3 rounded-full bg-ink/32 px-4 py-2 text-sm text-subtle lg:flex">
           <Search className="h-4 w-4" />
-          <span>Search photos...</span>
+          <span>Search memories...</span>
         </div>
         <LumozaButton type="button" variant="ghost" className="hidden px-3 lg:inline-flex" onClick={() => setCurrentView("settings")}>
           <Settings className="h-4 w-4" />
         </LumozaButton>
         <LumozaButton type="button" variant="primary" className="hidden xl:inline-flex" onClick={() => setCurrentView("dashboard")}>
           <Sparkles className="h-4 w-4" />
-          New project
+          New workspace
         </LumozaButton>
       </div>
     </div>
@@ -1041,5 +1050,5 @@ export function App() {
     content = <SettingsPage />;
   }
 
-  return <AppShell sidebar={sidebar} topbar={topbar}>{content}</AppShell>;
+  return <AppShell topbar={topbar} activeStage={activeWorkflowStage} workflowSteps={workflowSteps} onStageChange={handleWorkflowStageChange}>{content}</AppShell>;
 }

@@ -8,32 +8,33 @@ This repository now has:
 - A product baseline in `docs/PRODUCT_FOUNDATION.md`
 - Local git initialization and version history on `main`
 
-Current full product progress: 81%
-Current active phase progress: 100% (Phase 4)
+Current full product progress: 85%
+Current active phase progress: 35% (Phase 5)
 
 Phase 1 status: 100% complete, including native Rust/Tauri compile and macOS app bundle validation.
 Phase 2 status: 100% complete, with technical-quality scoring, connected-component duplicate grouping, burst grouping, grouping audit summaries, ranking confidence, project-wide album shortlist, review queue queries, and focused Rust tests in place.
 Phase 3 status: 100% complete, with local CPU face-candidate analysis, cache-only face crops, lightweight embeddings, people clustering, people list/review UI, rename, priority, hide, merge, and split controls.
 Phase 4 status: 100% complete, with smart-selection persistence, final/review/rejected buckets, scoring across quality, people priority, confidence, diversity, event coverage, low-confidence review routing, user override signals, target-count controls, selection-set browsing, keyboard review controls, export handoff preview, and refiltering without rescanning.
+Phase 5 status: 35% complete, with the storyboard reference adopted, adaptive workflow shell, visual workspace hub, guided create/source/configure flow, media analysis workflow screen, and compact settings refactor in place.
 
 Immediate repo priorities:
 
 1. Preserve the phase-based build discipline defined below.
 2. Use `docs/architecture.md` and `docs/phase-1-plan.md` as the implementation baseline.
-3. Phase 4 is complete. Next is Phase 5 professional polish after explicit confirmation.
+3. Phase 5 is in progress. Continue storyboard-driven workspace, people, moments, curation, review, finalize, and export polish before Phase 6.
 
 ## Progress Model
 
 Full product progress is tracked separately from phase completion.
 
-Current weighted estimate: `81%` overall.
+Current weighted estimate: `85%` overall.
 
 Basis:
 - Phase 1 foundation: `100%` complete
 - Phase 2 fast AI engine: `100%` complete
 - Phase 3 face intelligence: `100%` complete
 - Phase 4 smart selection engine: `100%` complete
-- Phase 5 professional polish: `0%` complete
+- Phase 5 professional polish: `35%` complete
 - Phase 6 production distribution and release hardening: `8%` complete
 - Cross-cutting product work still open: research, licensing, monetization, QA depth, observability, security hardening, Windows validation, release operations
 

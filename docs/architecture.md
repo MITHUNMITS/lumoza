@@ -531,3 +531,8 @@ The Python sidecar now advertises local Phase 3 readiness, while the Rust fast p
 ## Phase 4 Extension Note
 
 Phase 4 is complete with a persisted smart-selection model plus workspace controls for selection-set browsing, target-count refiltering, keyboard review, export handoff preview, and protect/include/exclude metadata overrides. The database tracks selection runs, final/review/rejected items, and user photo overrides. The local selector combines Phase 2 quality/confidence signals with Phase 3 people priority, face/group coverage, duplicate/burst diversity, temporal event coverage, low-confidence review routing, and protect/include/exclude overrides to build a refilterable final album foundation without rescanning original folders.
+
+
+## Phase 5 UI Architecture Note
+
+Phase 5 has started as a storyboard-driven workflow refactor using `layout_images_samples/Full_app_pages.png` as the primary reference. The app shell now moves away from dashboard navigation toward a persistent desktop workspace with a compact workflow rail, bottom stepper, adaptive center canvas, and contextual inspectors. The current slice covers the workflow shell, workspace hub, guided creation/source/configuration flow, media analysis screen, and compact settings surface while keeping Phase 1-4 native functionality stable.

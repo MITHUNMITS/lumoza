@@ -4,8 +4,8 @@
 
 Lumoza has completed Phase 1 foundation, Phase 2 fast AI engine implementation, and Phase 3 people intelligence. Phase 4 smart selection is now in progress.
 
-Current full product progress: 81%
-Current active phase progress: 100% (Phase 4)
+Current full product progress: 85%
+Current active phase progress: 35% (Phase 5)
 
 ## Phases
 
@@ -60,13 +60,13 @@ Every phase should be completed and reviewed before the next phase begins.
 
 This percentage is full-program progress, not phase-local progress.
 
-Current weighted estimate: `81%` overall.
+Current weighted estimate: `85%` overall.
 
 Interpretation:
 - Phase 1: 100% complete
 - Phase 2: 100% complete
 - Phase 3: 100% complete
 - Phase 4: 100% complete
-- Phase 5: 0% complete
+- Phase 5: 35% complete
 - Phase 6: 8% complete
 - Launch-critical cross-cutting work: mostly still open

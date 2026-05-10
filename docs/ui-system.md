@@ -43,7 +43,7 @@ Lumoza Studio should feel like premium creative desktop software: cinematic, cal
 
 ## Current Scope
 
-This UI pass redesigns the current Phase 1-3 surfaces and prepares future slots. It does not implement Phase 3 detection/clustering, Phase 4 final selection, Phase 5 storytelling, or Phase 6 packaging/model downloads.
+The primary UI/UX reference is now `layout_images_samples/Full_app_pages.png`. Phase 5 is refactoring the product toward one storyboard-driven adaptive desktop workspace shell while preserving Phase 1-4 functionality and avoiding premature Phase 6 model-download/export-runner behavior.
 
 ## Studio Refinement
 
