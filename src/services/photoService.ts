@@ -145,3 +145,22 @@ export async function listReviewQueuePhotos(projectId: string, limit = 18): Prom
   const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_review_queue", { projectId, limit });
   return photos.map(mapPhoto);
 }
+
+
+export async function listFinalSelectionPhotos(projectId: string, bucket: "final" | "review" | "rejected" = "final", limit = 300): Promise<ProjectPhoto[]> {
+  if (!hasTauriRuntime()) {
+    const projects = await listProjects();
+    const project = projects.find((entry) => entry.projectId === projectId);
+    const photos = createMockPhotos(projectId, project?.photoCount ?? 0).sort((left, right) => (right.rankingScore ?? 0) - (left.rankingScore ?? 0));
+    if (bucket === "review") {
+      return photos.filter((photo) => photo.selectionLabel === "review" || photo.confidenceLabel !== "high").slice(0, limit);
+    }
+    if (bucket === "rejected") {
+      return photos.filter((photo) => photo.selectionLabel === "reject").slice(0, limit);
+    }
+    return photos.filter((photo) => photo.selectionLabel === "keep" || photo.albumCandidate).slice(0, limit);
+  }
+
+  const photos = await invokeOrMock<RawProjectPhoto[]>("list_project_final_selection", { projectId, bucket, limit });
+  return photos.map(mapPhoto);
+}

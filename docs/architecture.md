@@ -527,3 +527,7 @@ The native analyzer computes sharpness, exposure, contrast, resolution, and over
 Phase 3 is complete as a local-first people intelligence workflow. The project database includes face-analysis run tracking, face detections, people clusters, and face-to-person membership tables. The native task layer now runs a CPU face-candidate detector, generates cache-only face crops, persists lightweight embeddings, clusters people deterministically, and exposes people summary counts to workspace and operations surfaces.
 
 The Python sidecar now advertises local Phase 3 readiness, while the Rust fast path owns the current offline people workflow. Phase 6 can replace or augment the CPU candidate detector with verified Face AI Pack models, but the same database and review contracts should remain stable.
+
+## Phase 4 Extension Note
+
+Phase 4 has started with a persisted smart-selection model. The database now tracks selection runs, final/review/rejected items, and user photo overrides. The local selector combines Phase 2 quality/confidence signals with Phase 3 people priority, face/group coverage, duplicate/burst diversity, and protect/include/exclude overrides to build a refilterable final album foundation.

@@ -75,6 +75,29 @@ impl PeopleAnalysisTaskSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartSelectionTaskSnapshot {
+    pub id: String,
+    pub project_id: String,
+    pub status: String,
+    pub progress_current: u64,
+    pub progress_total: u64,
+    pub message: String,
+    pub final_count_target: u64,
+    pub review_count_target: u64,
+    pub selected_count: u64,
+    pub review_count: u64,
+    pub rejected_count: u64,
+    pub protected_count: u64,
+}
+
+impl SmartSelectionTaskSnapshot {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.status.as_str(), "completed" | "cancelled" | "error")
+    }
+}
+
 #[derive(Default)]
 struct ControlFlags {
     paused: bool,
@@ -144,6 +167,8 @@ pub struct AppRuntime {
     quality_controls: Arc<Mutex<HashMap<String, Arc<ScanTaskControl>>>>,
     people_tasks: Arc<Mutex<HashMap<String, PeopleAnalysisTaskSnapshot>>>,
     project_people_tasks: Arc<Mutex<HashMap<String, String>>>,
+    selection_tasks: Arc<Mutex<HashMap<String, SmartSelectionTaskSnapshot>>>,
+    project_selection_tasks: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl AppRuntime {
@@ -303,6 +328,51 @@ impl AppRuntime {
         Some(task.clone())
     }
 
+    pub fn insert_selection_task(&self, task: SmartSelectionTaskSnapshot) {
+        if let Ok(mut tasks) = self.selection_tasks.lock() {
+            tasks.insert(task.id.clone(), task);
+        }
+    }
+
+    pub fn bind_project_selection_task(&self, project_id: String, task_id: String) {
+        if let Ok(mut project_tasks) = self.project_selection_tasks.lock() {
+            project_tasks.insert(project_id, task_id);
+        }
+    }
+
+    pub fn get_selection_task(&self, task_id: &str) -> Option<SmartSelectionTaskSnapshot> {
+        self.selection_tasks
+            .lock()
+            .ok()
+            .and_then(|tasks| tasks.get(task_id).cloned())
+    }
+
+    pub fn get_project_selection_task(
+        &self,
+        project_id: &str,
+    ) -> Option<SmartSelectionTaskSnapshot> {
+        let task_id = self
+            .project_selection_tasks
+            .lock()
+            .ok()
+            .and_then(|project_tasks| project_tasks.get(project_id).cloned())?;
+        self.get_selection_task(&task_id)
+    }
+
+    pub fn update_selection_task<F>(
+        &self,
+        task_id: &str,
+        mutate: F,
+    ) -> Option<SmartSelectionTaskSnapshot>
+    where
+        F: FnOnce(&mut SmartSelectionTaskSnapshot),
+    {
+        let mut tasks = self.selection_tasks.lock().ok()?;
+        let task = tasks.get_mut(task_id)?;
+        mutate(task);
+        Some(task.clone())
+    }
+
     pub fn active_task_count(&self) -> u64 {
         let scan_active = self
             .scan_tasks
@@ -322,7 +392,13 @@ impl AppRuntime {
             .ok()
             .map(|tasks| tasks.values().filter(|task| !task.is_terminal()).count() as u64)
             .unwrap_or(0);
-        scan_active + analysis_active + people_active
+        let selection_active = self
+            .selection_tasks
+            .lock()
+            .ok()
+            .map(|tasks| tasks.values().filter(|task| !task.is_terminal()).count() as u64)
+            .unwrap_or(0);
+        scan_active + analysis_active + people_active + selection_active
     }
 }
 

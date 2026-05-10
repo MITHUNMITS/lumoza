@@ -95,6 +95,27 @@ pub struct ProjectPeopleSummaryResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SelectionSummaryResponse {
+    pub selection_run_count: u64,
+    pub final_count_target: u64,
+    pub review_count_target: u64,
+    pub selected_count: u64,
+    pub review_count: u64,
+    pub rejected_count: u64,
+    pub protected_count: u64,
+    pub last_status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPhotoSelectionOverrideInput {
+    pub photo_id: String,
+    pub override_label: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectPersonFaceResponse {
     pub id: String,
     pub photo_id: String,
@@ -485,4 +506,83 @@ pub fn split_project_person_face(
         .into_iter()
         .map(map_project_person_response)
         .collect())
+}
+
+#[tauri::command]
+pub fn get_project_selection_summary(
+    app: AppHandle,
+    project_id: String,
+) -> Result<SelectionSummaryResponse, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let summary =
+        database::get_selection_summary(PathBuf::from(&project.project_db_path).as_path())
+            .map_err(|error| error.to_string())?;
+
+    Ok(SelectionSummaryResponse {
+        selection_run_count: summary.selection_run_count,
+        final_count_target: summary.final_count_target,
+        review_count_target: summary.review_count_target,
+        selected_count: summary.selected_count,
+        review_count: summary.review_count,
+        rejected_count: summary.rejected_count,
+        protected_count: summary.protected_count,
+        last_status: summary.last_status,
+    })
+}
+
+#[tauri::command]
+pub fn list_project_final_selection(
+    app: AppHandle,
+    project_id: String,
+    bucket: Option<String>,
+    limit: Option<u32>,
+) -> Result<Vec<ProjectPhotoResponse>, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let photos = database::list_final_selection_photos(
+        PathBuf::from(&project.project_db_path).as_path(),
+        bucket.as_deref().unwrap_or("final"),
+        limit.unwrap_or(300),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(photos.into_iter().map(map_project_photo_response).collect())
+}
+
+#[tauri::command]
+pub fn set_photo_selection_override(
+    app: AppHandle,
+    project_id: String,
+    input: SetPhotoSelectionOverrideInput,
+) -> Result<SelectionSummaryResponse, String> {
+    let project = project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+    let db_path = PathBuf::from(&project.project_db_path);
+
+    database::set_photo_selection_override(
+        db_path.as_path(),
+        &input.photo_id,
+        &input.override_label,
+        input.note,
+    )
+    .map_err(|error| error.to_string())?;
+
+    let summary =
+        database::get_selection_summary(db_path.as_path()).map_err(|error| error.to_string())?;
+    Ok(SelectionSummaryResponse {
+        selection_run_count: summary.selection_run_count,
+        final_count_target: summary.final_count_target,
+        review_count_target: summary.review_count_target,
+        selected_count: summary.selected_count,
+        review_count: summary.review_count,
+        rejected_count: summary.rejected_count,
+        protected_count: summary.protected_count,
+        last_status: summary.last_status,
+    })
 }

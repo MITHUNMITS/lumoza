@@ -8,7 +8,7 @@ Current phase status: complete
 
 Phase 2 progress: 100% complete
 Phase 2 slice progress: technical quality scoring complete, connected-component duplicate grouping complete, burst grouping complete, grouping audit summaries complete, ranking confidence complete, project-wide album shortlist complete, and review queue queries complete
-Full product progress: 65% overall
+Full product progress: 69% overall
 
 Phase 2 is complete as a fast local-first intelligence pass. It produces explainable technical scores, duplicate and burst groups, keep/review/reject guidance, confidence labels, album-candidate recommendations, review queues, and project-wide grouping audit summaries. This is still not the final memory-selection engine; Phase 3 and Phase 4 remain responsible for face intelligence and final selection logic.
 

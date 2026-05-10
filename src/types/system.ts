@@ -61,3 +61,19 @@ export interface PeopleAnalysisTask {
   clusteredPeopleCount: number;
   modelStatus: string;
 }
+
+
+export interface SmartSelectionTask {
+  id: string;
+  projectId: string;
+  status: ScanTaskStatus;
+  progressCurrent: number;
+  progressTotal: number;
+  message: string;
+  finalCountTarget: number;
+  reviewCountTarget: number;
+  selectedCount: number;
+  reviewCount: number;
+  rejectedCount: number;
+  protectedCount: number;
+}

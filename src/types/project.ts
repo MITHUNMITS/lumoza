@@ -34,6 +34,17 @@ export interface ProjectPeopleSummary {
   photosWithFacesCount: number;
 }
 
+export interface ProjectSelectionSummary {
+  selectionRunCount: number;
+  finalCountTarget: number;
+  reviewCountTarget: number;
+  selectedCount: number;
+  reviewCount: number;
+  rejectedCount: number;
+  protectedCount: number;
+  lastStatus?: string;
+}
+
 export interface ProjectPersonFace {
   id: string;
   photoId: string;

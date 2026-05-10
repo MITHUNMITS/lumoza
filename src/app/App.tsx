@@ -9,20 +9,20 @@ import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { StudioPage } from "../pages/StudioPage";
-import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getQualityAnalysisTask, listProjectGroupSummaries, listProjectPeople, mergeProjectPeople, splitProjectPersonFace, startPeopleAnalysis, startQualityAnalysis, updateProjectPerson } from "../services/analysisService";
-import { listAlbumCandidatePhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
+import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getProjectSelectionSummary, getQualityAnalysisTask, getSmartSelectionTask, listProjectGroupSummaries, listProjectPeople, mergeProjectPeople, splitProjectPersonFace, startPeopleAnalysis, startQualityAnalysis, startSmartSelection, updateProjectPerson } from "../services/analysisService";
+import { listAlbumCandidatePhotos, listFinalSelectionPhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
 import { bootstrapApplication, getSystemStatus } from "../services/systemStatusService";
 import { useAppStore } from "../stores/appStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useScanStore } from "../stores/scanStore";
-import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson, ProjectPhoto } from "../types/project";
-import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SystemStatus } from "../types/system";
+import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson, ProjectPhoto, ProjectSelectionSummary } from "../types/project";
+import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SmartSelectionTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
 
-function isTerminal(task?: ScanTask | QualityAnalysisTask | PeopleAnalysisTask) {
+function isTerminal(task?: ScanTask | QualityAnalysisTask | PeopleAnalysisTask | SmartSelectionTask) {
   return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
 }
 
@@ -35,6 +35,8 @@ export function App() {
   const [analysisSummary, setAnalysisSummary] = useState<ProjectAnalysisSummary | undefined>();
   const [peopleSummary, setPeopleSummary] = useState<ProjectPeopleSummary | undefined>();
   const [people, setPeople] = useState<ProjectPerson[]>([]);
+  const [selectionSummary, setSelectionSummary] = useState<ProjectSelectionSummary | undefined>();
+  const [finalSelectionPhotos, setFinalSelectionPhotos] = useState<ProjectPhoto[]>([]);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
   const [hasMorePhotos, setHasMorePhotos] = useState(false);
@@ -60,10 +62,12 @@ export function App() {
   const activeTask = useScanStore((state) => state.activeTask);
   const activeAnalysisTask = useScanStore((state) => state.activeAnalysisTask);
   const activePeopleTask = useScanStore((state) => state.activePeopleTask);
+  const activeSelectionTask = useScanStore((state) => state.activeSelectionTask);
   const activity = useScanStore((state) => state.activity);
   const setActiveTask = useScanStore((state) => state.setActiveTask);
   const setActiveAnalysisTask = useScanStore((state) => state.setActiveAnalysisTask);
   const setActivePeopleTask = useScanStore((state) => state.setActivePeopleTask);
+  const setActiveSelectionTask = useScanStore((state) => state.setActiveSelectionTask);
   const addActivity = useScanStore((state) => state.addActivity);
 
   useEffect(() => {
@@ -110,6 +114,8 @@ export function App() {
       setAnalysisSummary(undefined);
       setPeopleSummary(undefined);
       setPeople([]);
+      setSelectionSummary(undefined);
+      setFinalSelectionPhotos([]);
       setIsLoadingMorePhotos(false);
       setHasMorePhotos(false);
       setPhotoError(undefined);
@@ -129,8 +135,10 @@ export function App() {
       getProjectAnalysisSummary(currentProject.projectId),
       getProjectPeopleSummary(currentProject.projectId),
       listProjectPeople(currentProject.projectId),
+      getProjectSelectionSummary(currentProject.projectId),
+      listFinalSelectionPhotos(currentProject.projectId, "final", 12),
     ])
-      .then(([photos, shortlist, reviewItems, groups, summary, peopleSummary, projectPeople]) => {
+      .then(([photos, shortlist, reviewItems, groups, summary, peopleSummary, projectPeople, selection, finalSelection]) => {
         if (cancelled) {
           return;
         }
@@ -141,6 +149,8 @@ export function App() {
         setAnalysisSummary(summary);
         setPeopleSummary(peopleSummary);
         setPeople(projectPeople);
+        setSelectionSummary(selection);
+        setFinalSelectionPhotos(finalSelection);
         setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
       })
       .catch((error) => {
@@ -377,6 +387,63 @@ export function App() {
       window.clearInterval(interval);
     };
   }, [activePeopleTask, addActivity, setActivePeopleTask]);
+
+
+  useEffect(() => {
+    if (!activeSelectionTask || isTerminal(activeSelectionTask)) {
+      return;
+    }
+
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const nextTask = await getSmartSelectionTask(activeSelectionTask.id);
+        if (!nextTask || cancelled) {
+          return;
+        }
+        setActiveSelectionTask(nextTask);
+        if (isTerminal(nextTask)) {
+          const [selection, finalSelection] = await Promise.all([
+            getProjectSelectionSummary(nextTask.projectId),
+            listFinalSelectionPhotos(nextTask.projectId, "final", 12),
+          ]);
+          if (!cancelled) {
+            setSelectionSummary(selection);
+            setFinalSelectionPhotos(finalSelection);
+            addActivity({
+              id: crypto.randomUUID(),
+              eventType: nextTask.status === "error" ? "smart_selection_failed" : "smart_selection_completed",
+              severity: nextTask.status === "error" ? "error" : "info",
+              message: nextTask.message,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setActiveSelectionTask({
+            id: activeSelectionTask.id,
+            projectId: activeSelectionTask.projectId,
+            status: "error",
+            progressCurrent: activeSelectionTask.progressCurrent,
+            progressTotal: activeSelectionTask.progressTotal,
+            message: error instanceof Error ? error.message : "Smart selection failed.",
+            finalCountTarget: activeSelectionTask.finalCountTarget,
+            reviewCountTarget: activeSelectionTask.reviewCountTarget,
+            selectedCount: activeSelectionTask.selectedCount,
+            reviewCount: activeSelectionTask.reviewCount,
+            rejectedCount: activeSelectionTask.rejectedCount,
+            protectedCount: activeSelectionTask.protectedCount,
+          });
+        }
+      }
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeSelectionTask, addActivity, setActiveSelectionTask]);
 
   async function handleCreateProject(input: CreateProjectInput) {
     const project = await createProject(input);
@@ -638,6 +705,50 @@ export function App() {
     setPeopleSummary(nextSummary);
   }
 
+
+  async function handleStartSmartSelection() {
+    if (!currentProject) {
+      return;
+    }
+
+    try {
+      const task = await startSmartSelection(currentProject.projectId, { finalCountTarget: 300, reviewCountTarget: 1000 });
+      setActiveSelectionTask(task);
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "smart_selection_started",
+        severity: "info",
+        message: `Building final memory selection for ${currentProject.name}.`,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (isTerminal(task)) {
+        const [selection, finalSelection] = await Promise.all([
+          getProjectSelectionSummary(currentProject.projectId),
+          listFinalSelectionPhotos(currentProject.projectId, "final", 12),
+        ]);
+        setSelectionSummary(selection);
+        setFinalSelectionPhotos(finalSelection);
+      }
+    } catch (error) {
+      const task: SmartSelectionTask = {
+        id: crypto.randomUUID(),
+        projectId: currentProject.projectId,
+        status: "error",
+        progressCurrent: 0,
+        progressTotal: 0,
+        message: error instanceof Error ? error.message : "Smart selection failed.",
+        finalCountTarget: 300,
+        reviewCountTarget: 1000,
+        selectedCount: 0,
+        reviewCount: 0,
+        rejectedCount: 0,
+        protectedCount: 0,
+      };
+      setActiveSelectionTask(task);
+    }
+  }
+
   async function handlePauseScan() {
     if (!currentProject || !activeTask) {
       return;
@@ -772,16 +883,20 @@ export function App() {
         groupSummaries={groupSummaries}
         analysisSummary={analysisSummary}
         peopleSummary={peopleSummary}
+        selectionSummary={selectionSummary}
+        finalSelectionPhotos={finalSelectionPhotos}
         isLoadingPhotos={isLoadingPhotos}
         isLoadingMorePhotos={isLoadingMorePhotos}
         hasMorePhotos={hasMorePhotos}
         photoError={photoError}
         task={activeTask}
         analysisTask={activeAnalysisTask}
+        selectionTask={activeSelectionTask}
         activity={activity}
         onLoadMorePhotos={handleLoadMorePhotos}
         onStartScan={handleStartScan}
         onStartAnalysis={handleStartAnalysis}
+        onStartSmartSelection={handleStartSmartSelection}
         onPause={handlePauseScan}
         onResume={handleResumeScan}
         onCancel={handleCancelScan}

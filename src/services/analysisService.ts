@@ -1,6 +1,6 @@
 import { invokeOrMock } from "./tauriCommands";
-import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson } from "../types/project";
-import type { PeopleAnalysisTask, QualityAnalysisTask } from "../types/system";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPerson, ProjectSelectionSummary } from "../types/project";
+import type { PeopleAnalysisTask, QualityAnalysisTask, SmartSelectionTask } from "../types/system";
 
 const hasTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -78,6 +78,67 @@ export async function startPeopleAnalysis(projectId: string) {
 
 export function getPeopleAnalysisTask(taskId: string) {
   return invokeOrMock<PeopleAnalysisTask | null>("get_people_analysis_task", { taskId }, null);
+}
+
+
+function mockSelectionTask(projectId: string): SmartSelectionTask {
+  return {
+    id: crypto.randomUUID(),
+    projectId,
+    status: "completed",
+    progressCurrent: 48,
+    progressTotal: 48,
+    message: "Smart selection complete: 24 final memories, 18 review items, 6 rejected candidates.",
+    finalCountTarget: 300,
+    reviewCountTarget: 1000,
+    selectedCount: 24,
+    reviewCount: 18,
+    rejectedCount: 6,
+    protectedCount: 1,
+  };
+}
+
+export async function startSmartSelection(projectId: string, input?: { finalCountTarget?: number; reviewCountTarget?: number }) {
+  if (!hasTauriRuntime()) {
+    void input;
+    return mockSelectionTask(projectId);
+  }
+
+  return invokeOrMock<SmartSelectionTask>("start_smart_selection", { projectId, input });
+}
+
+export function getSmartSelectionTask(taskId: string) {
+  return invokeOrMock<SmartSelectionTask | null>("get_smart_selection_task", { taskId }, null);
+}
+
+export async function getProjectSelectionSummary(projectId: string): Promise<ProjectSelectionSummary> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    return {
+      selectionRunCount: 1,
+      finalCountTarget: 300,
+      reviewCountTarget: 1000,
+      selectedCount: 24,
+      reviewCount: 18,
+      rejectedCount: 6,
+      protectedCount: 1,
+      lastStatus: "completed",
+    };
+  }
+
+  return invokeOrMock<ProjectSelectionSummary>("get_project_selection_summary", { projectId });
+}
+
+export async function setPhotoSelectionOverride(projectId: string, photoId: string, overrideLabel: string, note?: string): Promise<ProjectSelectionSummary> {
+  if (!hasTauriRuntime()) {
+    void projectId;
+    void photoId;
+    void overrideLabel;
+    void note;
+    return getProjectSelectionSummary(projectId);
+  }
+
+  return invokeOrMock<ProjectSelectionSummary>("set_photo_selection_override", { projectId, input: { photoId, overrideLabel, note } });
 }
 
 export async function getProjectAnalysisSummary(projectId: string): Promise<ProjectAnalysisSummary> {

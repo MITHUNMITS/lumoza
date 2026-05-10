@@ -1,17 +1,20 @@
 use std::{path::Path, sync::Arc, thread};
 
+use serde::Deserialize;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use crate::{
-    services::{database, people_analyzer, quality_analyzer},
+    services::{database, people_analyzer, quality_analyzer, smart_selector},
     state::app_state::{
         AppState, PeopleAnalysisTaskSnapshot, QualityAnalysisTaskSnapshot, ScanTaskControl,
+        SmartSelectionTaskSnapshot,
     },
 };
 
 pub type QualityAnalysisTaskResponse = QualityAnalysisTaskSnapshot;
 pub type PeopleAnalysisTaskResponse = PeopleAnalysisTaskSnapshot;
+pub type SmartSelectionTaskResponse = SmartSelectionTaskSnapshot;
 
 #[tauri::command]
 pub fn start_quality_analysis(
@@ -369,6 +372,157 @@ fn run_people_analysis_task(
             let _ = runtime.update_people_task(&task_id, |task| {
                 task.status = "error".into();
                 task.message = format!("People analysis failed: {error}");
+            });
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartSmartSelectionInput {
+    pub final_count_target: Option<u64>,
+    pub review_count_target: Option<u64>,
+}
+
+#[tauri::command]
+pub fn start_smart_selection(
+    app: AppHandle,
+    state: State<AppState>,
+    project_id: String,
+    input: Option<StartSmartSelectionInput>,
+) -> Result<SmartSelectionTaskResponse, String> {
+    let runtime = state.runtime();
+
+    if let Some(existing) = runtime.get_project_selection_task(&project_id) {
+        if !existing.is_terminal() {
+            return Ok(existing);
+        }
+    }
+
+    let project = crate::services::project_registry::find_project(&app, &project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("project {project_id} was not found in the registry"))?;
+
+    let candidates =
+        database::list_selection_candidate_records(Path::new(&project.project_db_path))
+            .map_err(|error| error.to_string())?;
+    let final_count_target = input
+        .as_ref()
+        .and_then(|value| value.final_count_target)
+        .unwrap_or(300)
+        .clamp(1, 10_000);
+    let review_count_target = input
+        .as_ref()
+        .and_then(|value| value.review_count_target)
+        .unwrap_or(1000)
+        .clamp(0, 30_000);
+
+    let task = SmartSelectionTaskSnapshot {
+        id: Uuid::new_v4().to_string(),
+        project_id: project_id.clone(),
+        status: "running".into(),
+        progress_current: 0,
+        progress_total: candidates.len() as u64,
+        message: if candidates.is_empty() {
+            "No indexed memories are available for smart selection.".into()
+        } else {
+            format!(
+                "Building final memory selection from {} candidates...",
+                candidates.len()
+            )
+        },
+        final_count_target,
+        review_count_target,
+        selected_count: 0,
+        review_count: 0,
+        rejected_count: 0,
+        protected_count: 0,
+    };
+
+    runtime.insert_selection_task(task.clone());
+    runtime.bind_project_selection_task(project_id, task.id.clone());
+
+    let runtime_clone = runtime.clone();
+    let task_id = task.id.clone();
+    thread::spawn(move || {
+        run_smart_selection_task(
+            runtime_clone,
+            task_id,
+            project.project_db_path,
+            candidates,
+            final_count_target,
+            review_count_target,
+        );
+    });
+
+    Ok(task)
+}
+
+#[tauri::command]
+pub fn get_smart_selection_task(
+    state: State<AppState>,
+    task_id: String,
+) -> Option<SmartSelectionTaskResponse> {
+    state.runtime().get_selection_task(&task_id)
+}
+
+fn run_smart_selection_task(
+    runtime: crate::state::app_state::AppRuntime,
+    task_id: String,
+    project_db_path: String,
+    candidates: Vec<database::SelectionCandidateRecord>,
+    final_count_target: u64,
+    review_count_target: u64,
+) {
+    if candidates.is_empty() {
+        let _ = runtime.update_selection_task(&task_id, |task| {
+            task.status = "completed".into();
+            task.message =
+                "Smart selection skipped because no indexed memories are available yet.".into();
+        });
+        return;
+    }
+
+    let _ = runtime.update_selection_task(&task_id, |task| {
+        task.progress_current = candidates.len() as u64;
+        task.message =
+            "Balancing quality, people coverage, diversity, and user protections...".into();
+    });
+
+    let result =
+        smart_selector::build_smart_selection(&candidates, final_count_target, review_count_target);
+    let run_id = Uuid::new_v4().to_string();
+    let persist_result = database::persist_smart_selection(
+        Path::new(&project_db_path),
+        &run_id,
+        final_count_target,
+        review_count_target,
+        candidates.len() as u64,
+        &result,
+    );
+
+    match persist_result {
+        Ok(()) => {
+            let _ = runtime.update_selection_task(&task_id, |task| {
+                task.status = "completed".into();
+                task.progress_current = candidates.len() as u64;
+                task.selected_count = result.selected_count;
+                task.review_count = result.review_count;
+                task.rejected_count = result.rejected_count;
+                task.protected_count = result.protected_count;
+                task.message = format!(
+                    "Smart selection complete: {} final memories, {} review items, {} rejected candidates, {} protected overrides.",
+                    result.selected_count,
+                    result.review_count,
+                    result.rejected_count,
+                    result.protected_count,
+                );
+            });
+        }
+        Err(error) => {
+            let _ = runtime.update_selection_task(&task_id, |task| {
+                task.status = "error".into();
+                task.message = format!("Smart selection failed: {error}");
             });
         }
     }

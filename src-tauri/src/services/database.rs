@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::Context;
 use chrono::Utc;
-use rusqlite::{params, Connection, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
 use crate::{
     commands::project::ProjectSummary,
@@ -12,16 +12,18 @@ use crate::{
             PhotoCurationScoreRecord, PhotoGroupingRecord, PhotoQualityMetricsRecord,
         },
         scan_indexer::IndexedPhoto,
+        smart_selector::SmartSelectionResult,
         thumbnail_pipeline::GeneratedThumbnail,
     },
 };
 
-const MIGRATIONS: [&str; 5] = [
+const MIGRATIONS: [&str; 6] = [
     include_str!("../../migrations/0001_init.sql"),
     include_str!("../../migrations/0002_analysis.sql"),
     include_str!("../../migrations/0003_ranking.sql"),
     include_str!("../../migrations/0004_curation_confidence.sql"),
     include_str!("../../migrations/0005_people.sql"),
+    include_str!("../../migrations/0006_smart_selection.sql"),
 ];
 
 #[derive(Debug)]
@@ -120,6 +122,51 @@ pub struct ProjectPersonRecord {
 }
 
 #[derive(Debug, Clone)]
+pub struct SelectionCandidateRecord {
+    pub photo_id: String,
+    pub filename: String,
+    pub modified_at: Option<String>,
+    pub overall_score: Option<f64>,
+    pub ranking_score: Option<f64>,
+    pub confidence_score: Option<f64>,
+    pub confidence_label: Option<String>,
+    pub selection_label: Option<String>,
+    pub album_candidate: bool,
+    pub duplicate_group_id: Option<String>,
+    pub burst_group_id: Option<String>,
+    pub priority_people_count: u64,
+    pub named_people_count: u64,
+    pub face_count: u64,
+    pub override_label: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FinalSelectionItemRecord {
+    pub photo_id: String,
+    pub selection_bucket: String,
+    pub final_rank: u64,
+    pub selection_score: f64,
+    pub quality_score: f64,
+    pub people_score: f64,
+    pub diversity_score: f64,
+    pub confidence_score: f64,
+    pub explanation: String,
+    pub coverage_reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectionSummaryRecord {
+    pub selection_run_count: u64,
+    pub final_count_target: u64,
+    pub review_count_target: u64,
+    pub selected_count: u64,
+    pub review_count: u64,
+    pub rejected_count: u64,
+    pub protected_count: u64,
+    pub last_status: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AnalysisPhotoRecord {
     pub photo_id: String,
     pub absolute_path: String,
@@ -174,6 +221,9 @@ pub fn persist_scan(
     transaction.execute("DELETE FROM people_clusters", [])?;
     transaction.execute("DELETE FROM face_detections", [])?;
     transaction.execute("DELETE FROM face_analysis_runs", [])?;
+    transaction.execute("DELETE FROM final_selection_items", [])?;
+    transaction.execute("DELETE FROM selection_runs", [])?;
+    transaction.execute("DELETE FROM photo_selection_overrides", [])?;
     transaction.execute("DELETE FROM analysis_runs", [])?;
     transaction.execute(
         "DELETE FROM thumbnails WHERE photo_id IN (SELECT id FROM photos WHERE source_folder_id = ?1)",
@@ -255,6 +305,330 @@ pub fn persist_scan(
         indexed_count: photos.len() as u64,
         failed_count,
     })
+}
+
+pub fn list_selection_candidate_records(
+    path: &Path,
+) -> anyhow::Result<Vec<SelectionCandidateRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let mut statement = connection.prepare(
+        "SELECT
+            photos.id,
+            photos.filename,
+            photos.modified_at,
+            photo_quality_metrics.overall_score,
+            photo_curation_scores.ranking_score,
+            photo_curation_recommendations.confidence_score,
+            photo_curation_recommendations.confidence_label,
+            photo_curation_scores.selection_label,
+            photo_curation_recommendations.album_candidate,
+            duplicate_groups.id,
+            burst_groups.id,
+            COUNT(DISTINCT CASE WHEN people_clusters.priority_label != 'unassigned' THEN people_clusters.id END),
+            COUNT(DISTINCT CASE WHEN people_clusters.display_name IS NOT NULL AND TRIM(people_clusters.display_name) != '' THEN people_clusters.id END),
+            COUNT(DISTINCT face_detections.id),
+            photo_selection_overrides.override_label
+         FROM photos
+         LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
+         LEFT JOIN photo_curation_scores ON photo_curation_scores.photo_id = photos.id
+         LEFT JOIN photo_curation_recommendations ON photo_curation_recommendations.photo_id = photos.id
+         LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
+         LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         LEFT JOIN face_detections ON face_detections.photo_id = photos.id
+         LEFT JOIN person_faces ON person_faces.face_detection_id = face_detections.id
+         LEFT JOIN people_clusters ON people_clusters.id = person_faces.person_id AND people_clusters.is_hidden = 0
+         LEFT JOIN photo_selection_overrides ON photo_selection_overrides.photo_id = photos.id
+         GROUP BY photos.id, photos.filename, photos.modified_at, photo_quality_metrics.overall_score, photo_curation_scores.ranking_score, photo_curation_recommendations.confidence_score, photo_curation_recommendations.confidence_label, photo_curation_scores.selection_label, photo_curation_recommendations.album_candidate, duplicate_groups.id, burst_groups.id, photo_selection_overrides.override_label
+         ORDER BY COALESCE(photo_curation_scores.ranking_score, photo_quality_metrics.overall_score, 0) DESC, photos.filename ASC",
+    )?;
+
+    let rows = statement.query_map([], |row| {
+        Ok(SelectionCandidateRecord {
+            photo_id: row.get::<_, String>(0)?,
+            filename: row.get::<_, String>(1)?,
+            modified_at: row.get::<_, Option<String>>(2)?,
+            overall_score: row.get::<_, Option<f64>>(3)?,
+            ranking_score: row.get::<_, Option<f64>>(4)?,
+            confidence_score: row.get::<_, Option<f64>>(5)?,
+            confidence_label: row.get::<_, Option<String>>(6)?,
+            selection_label: row.get::<_, Option<String>>(7)?,
+            album_candidate: row.get::<_, Option<i64>>(8)?.unwrap_or(0) != 0,
+            duplicate_group_id: row.get::<_, Option<String>>(9)?,
+            burst_group_id: row.get::<_, Option<String>>(10)?,
+            priority_people_count: row.get::<_, i64>(11)? as u64,
+            named_people_count: row.get::<_, i64>(12)? as u64,
+            face_count: row.get::<_, i64>(13)? as u64,
+            override_label: row.get::<_, Option<String>>(14)?,
+        })
+    })?;
+
+    let mut candidates = Vec::new();
+    for row in rows {
+        candidates.push(row?);
+    }
+    Ok(candidates)
+}
+
+pub fn persist_smart_selection(
+    path: &Path,
+    run_id: &str,
+    final_count_target: u64,
+    review_count_target: u64,
+    photos_total: u64,
+    result: &SmartSelectionResult,
+) -> anyhow::Result<()> {
+    let mut connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let transaction = connection.transaction()?;
+    let now = Utc::now().to_rfc3339();
+
+    transaction.execute("DELETE FROM final_selection_items", [])?;
+    transaction.execute("DELETE FROM selection_runs", [])?;
+    transaction.execute(
+        "INSERT INTO selection_runs (id, status, engine, engine_version, final_count_target, review_count_target, photos_total, selected_count, review_count, rejected_count, protected_count, started_at, ended_at)
+         VALUES (?1, 'completed', 'lumoza-smart-selection-v1', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+        params![
+            run_id,
+            env!("CARGO_PKG_VERSION"),
+            final_count_target as i64,
+            review_count_target as i64,
+            photos_total as i64,
+            result.selected_count as i64,
+            result.review_count as i64,
+            result.rejected_count as i64,
+            result.protected_count as i64,
+            now.as_str(),
+        ],
+    )?;
+
+    let mut statement = transaction.prepare(
+        "INSERT INTO final_selection_items (run_id, photo_id, selection_bucket, final_rank, selection_score, quality_score, people_score, diversity_score, confidence_score, explanation, coverage_reason, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+    )?;
+    for item in &result.items {
+        statement.execute(params![
+            run_id,
+            item.photo_id.as_str(),
+            item.selection_bucket.as_str(),
+            item.final_rank as i64,
+            item.selection_score,
+            item.quality_score,
+            item.people_score,
+            item.diversity_score,
+            item.confidence_score,
+            item.explanation.as_str(),
+            item.coverage_reason.as_str(),
+            now.as_str(),
+        ])?;
+    }
+    drop(statement);
+
+    transaction.execute(
+        "INSERT INTO activity_log (id, event_type, severity, message, payload_json, created_at)
+         VALUES (?1, 'smart_selection_completed', 'info', ?2, ?3, ?4)",
+        params![
+            format!("selection-run-{run_id}"),
+            format!(
+                "Built final selection with {} final memories, {} review items, and {} rejected candidates.",
+                result.selected_count, result.review_count, result.rejected_count,
+            ),
+            format!(
+                r#"{{"finalCount": {}, "reviewCount": {}, "rejectedCount": {}, "protectedCount": {}}}"#,
+                result.selected_count, result.review_count, result.rejected_count, result.protected_count,
+            ),
+            now.as_str(),
+        ],
+    )?;
+
+    transaction.commit()?;
+    Ok(())
+}
+
+pub fn get_selection_summary(path: &Path) -> anyhow::Result<SelectionSummaryRecord> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let selection_run_count =
+        connection.query_row("SELECT COUNT(*) FROM selection_runs", [], |row| {
+            Ok(row.get::<_, i64>(0)? as u64)
+        })?;
+    let latest = connection
+        .query_row(
+            "SELECT final_count_target, review_count_target, selected_count, review_count, rejected_count, protected_count, status FROM selection_runs ORDER BY started_at DESC LIMIT 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as u64,
+                    row.get::<_, i64>(1)? as u64,
+                    row.get::<_, i64>(2)? as u64,
+                    row.get::<_, i64>(3)? as u64,
+                    row.get::<_, i64>(4)? as u64,
+                    row.get::<_, i64>(5)? as u64,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()?;
+
+    let Some((
+        final_count_target,
+        review_count_target,
+        selected_count,
+        review_count,
+        rejected_count,
+        protected_count,
+        last_status,
+    )) = latest
+    else {
+        return Ok(SelectionSummaryRecord {
+            selection_run_count,
+            final_count_target: 300,
+            review_count_target: 1000,
+            selected_count: 0,
+            review_count: 0,
+            rejected_count: 0,
+            protected_count: 0,
+            last_status: None,
+        });
+    };
+
+    Ok(SelectionSummaryRecord {
+        selection_run_count,
+        final_count_target,
+        review_count_target,
+        selected_count,
+        review_count,
+        rejected_count,
+        protected_count,
+        last_status: Some(last_status),
+    })
+}
+
+pub fn set_photo_selection_override(
+    path: &Path,
+    photo_id: &str,
+    override_label: &str,
+    note: Option<String>,
+) -> anyhow::Result<()> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let normalized = normalize_selection_override(override_label);
+    let now = Utc::now().to_rfc3339();
+
+    if normalized == "clear" {
+        connection.execute(
+            "DELETE FROM photo_selection_overrides WHERE photo_id = ?1",
+            params![photo_id],
+        )?;
+        return Ok(());
+    }
+
+    connection.execute(
+        "INSERT INTO photo_selection_overrides (photo_id, override_label, note, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?4)
+         ON CONFLICT(photo_id) DO UPDATE SET override_label = excluded.override_label, note = excluded.note, updated_at = excluded.updated_at",
+        params![photo_id, normalized.as_str(), note.as_deref(), now.as_str()],
+    )?;
+    Ok(())
+}
+
+fn normalize_selection_override(value: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "force_include" | "include" => "force_include".to_string(),
+        "force_exclude" | "exclude" => "force_exclude".to_string(),
+        "protect" | "protected" => "protect".to_string(),
+        _ => "clear".to_string(),
+    }
+}
+
+pub fn list_final_selection_photos(
+    path: &Path,
+    bucket: &str,
+    limit: u32,
+) -> anyhow::Result<Vec<ProjectPhotoRecord>> {
+    let connection = open_connection(path)?;
+    apply_migrations(&connection, path)?;
+    let safe_bucket = match bucket {
+        "review" => "review",
+        "rejected" => "rejected",
+        _ => "final",
+    };
+    let safe_limit = limit.clamp(1, 1000);
+    let mut statement = connection.prepare(
+        "WITH latest_run AS (SELECT id FROM selection_runs ORDER BY started_at DESC LIMIT 1)
+         SELECT
+            photos.id,
+            photos.absolute_path,
+            photos.filename,
+            photos.extension,
+            photos.file_size_bytes,
+            photos.width,
+            photos.height,
+            photos.modified_at,
+            photos.thumbnail_status,
+            thumbnails.cache_path,
+            photo_quality_metrics.sharpness_score,
+            photo_quality_metrics.exposure_score,
+            photo_quality_metrics.contrast_score,
+            photo_quality_metrics.resolution_score,
+            COALESCE(photo_quality_metrics.overall_score, final_selection_items.quality_score),
+            duplicate_groups.id,
+            burst_groups.id,
+            final_selection_items.selection_score,
+            CASE final_selection_items.selection_bucket WHEN 'final' THEN 'keep' WHEN 'review' THEN 'review' ELSE 'reject' END,
+            final_selection_items.explanation,
+            final_selection_items.confidence_score,
+            CASE WHEN final_selection_items.confidence_score >= 0.72 THEN 'high' WHEN final_selection_items.confidence_score >= 0.50 THEN 'medium' ELSE 'low' END,
+            CASE final_selection_items.selection_bucket WHEN 'final' THEN 1 ELSE 0 END
+         FROM final_selection_items
+         JOIN latest_run ON latest_run.id = final_selection_items.run_id
+         JOIN photos ON photos.id = final_selection_items.photo_id
+         LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
+         LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
+         LEFT JOIN duplicate_group_members AS duplicate_members ON duplicate_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
+         LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
+         LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         WHERE final_selection_items.selection_bucket = ?1
+         ORDER BY final_selection_items.final_rank ASC
+         LIMIT ?2",
+    )?;
+
+    let rows = statement.query_map(params![safe_bucket, safe_limit as i64], |row| {
+        Ok(ProjectPhotoRecord {
+            id: row.get::<_, String>(0)?,
+            absolute_path: row.get::<_, String>(1)?,
+            filename: row.get::<_, String>(2)?,
+            extension: row.get::<_, String>(3)?,
+            file_size_bytes: row.get::<_, i64>(4)? as u64,
+            width: row.get::<_, Option<i64>>(5)?.map(|value| value as u32),
+            height: row.get::<_, Option<i64>>(6)?.map(|value| value as u32),
+            modified_at: row.get::<_, Option<String>>(7)?,
+            thumbnail_status: row.get::<_, String>(8)?,
+            thumbnail_cache_path: row.get::<_, Option<String>>(9)?,
+            sharpness_score: row.get::<_, Option<f64>>(10)?,
+            exposure_score: row.get::<_, Option<f64>>(11)?,
+            contrast_score: row.get::<_, Option<f64>>(12)?,
+            resolution_score: row.get::<_, Option<f64>>(13)?,
+            overall_score: row.get::<_, Option<f64>>(14)?,
+            duplicate_group_id: row.get::<_, Option<String>>(15)?,
+            burst_group_id: row.get::<_, Option<String>>(16)?,
+            ranking_score: row.get::<_, Option<f64>>(17)?,
+            selection_label: row.get::<_, Option<String>>(18)?,
+            selection_reason: row.get::<_, Option<String>>(19)?,
+            confidence_score: row.get::<_, Option<f64>>(20)?,
+            confidence_label: row.get::<_, Option<String>>(21)?,
+            album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+        })
+    })?;
+
+    let mut photos = Vec::new();
+    for row in rows {
+        photos.push(row?);
+    }
+    Ok(photos)
 }
 
 pub fn list_project_photos(

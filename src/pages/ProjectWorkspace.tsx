@@ -1,10 +1,10 @@
-import { BrainCircuit, ScanLine, Sparkles, UsersRound } from "lucide-react";
+import { BrainCircuit, ScanLine, Sparkles, Trophy, UsersRound } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { LumozaButton } from "../components/ui/LumozaButton";
 import { StatusPill } from "../components/ui/StatusPill";
-import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSummary } from "../types/project";
-import type { ActivityItem, QualityAnalysisTask, ScanTask } from "../types/system";
+import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSelectionSummary, ProjectSummary } from "../types/project";
+import type { ActivityItem, QualityAnalysisTask, ScanTask, SmartSelectionTask } from "../types/system";
 
 interface ProjectWorkspaceProps {
   project: ProjectSummary;
@@ -14,16 +14,20 @@ interface ProjectWorkspaceProps {
   groupSummaries: CurationGroupSummary[];
   analysisSummary?: ProjectAnalysisSummary;
   peopleSummary?: ProjectPeopleSummary;
+  selectionSummary?: ProjectSelectionSummary;
+  finalSelectionPhotos: ProjectPhoto[];
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
   hasMorePhotos: boolean;
   photoError?: string;
   task?: ScanTask;
   analysisTask?: QualityAnalysisTask;
+  selectionTask?: SmartSelectionTask;
   activity: ActivityItem[];
   onLoadMorePhotos: () => void;
   onStartScan: () => void;
   onStartAnalysis: () => void;
+  onStartSmartSelection: () => void;
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
@@ -54,16 +58,20 @@ export function ProjectWorkspace({
   groupSummaries,
   analysisSummary,
   peopleSummary,
+  selectionSummary,
+  finalSelectionPhotos,
   isLoadingPhotos,
   isLoadingMorePhotos,
   hasMorePhotos,
   photoError,
   task,
   analysisTask,
+  selectionTask,
   activity,
   onLoadMorePhotos,
   onStartScan,
   onStartAnalysis,
+  onStartSmartSelection,
   onPause,
   onResume,
   onCancel,
@@ -77,6 +85,11 @@ export function ProjectWorkspace({
   const detectedFaceCount = peopleSummary?.detectedFaceCount ?? 0;
   const clusteredPeopleCount = peopleSummary?.clusteredPeopleCount ?? 0;
   const visibleAlbumCandidates = albumCandidates.slice(0, 4);
+  const visibleFinalSelection = finalSelectionPhotos.slice(0, 4);
+  const selectedCount = selectionTask?.selectedCount ?? selectionSummary?.selectedCount ?? 0;
+  const finalTarget = selectionTask?.finalCountTarget ?? selectionSummary?.finalCountTarget ?? 300;
+  const selectionReviewCount = selectionTask?.reviewCount ?? selectionSummary?.reviewCount ?? 0;
+  const protectedCount = selectionTask?.protectedCount ?? selectionSummary?.protectedCount ?? 0;
   const latestActivity = activity.slice(0, 3);
   const activeGroups = groupSummaries.slice(0, 4);
 
@@ -94,6 +107,7 @@ export function ProjectWorkspace({
               <h2 className="mt-2 truncate text-2xl font-semibold tracking-[-0.05em] text-text">{project.name}</h2>
             </div>
             <div className="flex flex-wrap gap-2">
+              <LumozaButton type="button" onClick={onStartSmartSelection} variant="secondary"><Trophy className="h-4 w-4" /> Select</LumozaButton>
               <LumozaButton type="button" onClick={onStartAnalysis} variant="secondary"><BrainCircuit className="h-4 w-4" /> Analyze</LumozaButton>
               <LumozaButton type="button" onClick={onStartScan} variant="primary"><ScanLine className="h-4 w-4" /> Scan</LumozaButton>
             </div>
@@ -112,6 +126,31 @@ export function ProjectWorkspace({
 
       <aside className="lumoza-scrollbar hidden min-h-0 space-y-4 overflow-y-auto pr-1 xl:block">
         <ScanProgressCard task={task} onPause={onPause} onResume={onResume} onCancel={onCancel} />
+
+
+        <section className="rounded-[30px] bg-white/[0.035] p-5 shadow-soft">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-text"><Trophy className="h-4 w-4 text-warning" /> Final selection</div>
+            <span className="text-xs text-subtle">{selectionTask?.status ?? selectionSummary?.lastStatus ?? "ready"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CompactStat label="Final" value={`${selectedCount}/${finalTarget}`} />
+            <CompactStat label="Review" value={selectionReviewCount} />
+            <CompactStat label="Protected" value={protectedCount} />
+            <CompactStat label="Runs" value={selectionSummary?.selectionRunCount ?? 0} />
+          </div>
+          {selectionTask ? <p className="mt-4 line-clamp-2 text-xs leading-5 text-muted">{selectionTask.message}</p> : null}
+          <LumozaButton type="button" variant="primary" className="mt-4 w-full" disabled={selectionTask?.status === "running"} onClick={onStartSmartSelection}>Build final album</LumozaButton>
+          <div className="mt-4 space-y-2">
+            {visibleFinalSelection.length === 0 ? <p className="text-sm text-subtle">Run smart selection for final memories.</p> : null}
+            {visibleFinalSelection.map((photo) => (
+              <div key={photo.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.045] px-3 py-2 text-sm">
+                <span className="truncate text-muted">{photo.filename}</span>
+                <span className="font-mono text-xs text-warning">{photo.rankingScore !== undefined ? `${(photo.rankingScore * 100).toFixed(0)}%` : "final"}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="rounded-[30px] bg-white/[0.035] p-5 shadow-soft">
           <div className="mb-4 flex items-center justify-between">
