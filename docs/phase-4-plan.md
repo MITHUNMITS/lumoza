@@ -6,28 +6,29 @@ Build the smart selection engine that turns Phase 2 technical scores and Phase 3
 
 Current phase status: in progress
 
-Phase 4 progress: 35% complete
-Full product progress: 69% overall
+Phase 4 progress: 60% complete
+Full product progress: 73% overall
 
-This first Phase 4 slice adds the durable selection model and runnable local engine. It does not yet complete the full review UX, relationship graph, event grouping, or advanced refiltering controls.
+Phase 4 now has the durable selection model, runnable local engine, final/review/rejected browsing, target-count controls, and user override controls. It does not yet complete the relationship graph, event grouping, low-confidence review depth, or final Phase 4 persistence hardening.
 
-## Completed In This Slice
+## Completed So Far
 
 - Added `selection_runs`, `final_selection_items`, and `photo_selection_overrides`
 - Added smart-selection task plumbing and progress state
 - Added local smart-selection engine using quality, confidence, people priority, group diversity, and user override signals
 - Added final/review/rejected buckets with explanations and coverage reasons
 - Added final-selection summary and final-photo query commands
-- Added workspace control to build the final album
+- Added workspace control to build and refilter the final album
+- Added final/review/rejected browsing in the workspace grid
+- Added final/review target controls for rerunning selection without rescanning
+- Added protect, force include, force exclude, and clear controls on photo cards
+- Added override labels to native photo responses and frontend photo models
 - Added Rust tests for priority-people ranking and force-exclude behavior
 
 ## Remaining Phase 4 Work
 
-- Review 1000 workspace with fast approve/reject controls
-- Final 300 workspace with protected-photo controls surfaced directly on photo cards
-- User override UI for protect, force include, and force exclude
-- Dynamic final/review count controls
-- Refiltering without rescanning
+- Review workspace fast keyboard approve/reject flow
+- Final workspace batch review and export handoff polish
 - Relationship coverage model beyond simple people priority counts
 - Event/time grouping and album section balancing
 - Low-confidence review page

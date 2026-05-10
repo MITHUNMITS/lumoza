@@ -56,6 +56,7 @@ pub struct ProjectPhotoRecord {
     pub selection_reason: Option<String>,
     pub confidence_score: Option<f64>,
     pub confidence_label: Option<String>,
+    pub override_label: Option<String>,
     pub album_candidate: bool,
 }
 
@@ -581,7 +582,8 @@ pub fn list_final_selection_photos(
             final_selection_items.explanation,
             final_selection_items.confidence_score,
             CASE WHEN final_selection_items.confidence_score >= 0.72 THEN 'high' WHEN final_selection_items.confidence_score >= 0.50 THEN 'medium' ELSE 'low' END,
-            CASE final_selection_items.selection_bucket WHEN 'final' THEN 1 ELSE 0 END
+            CASE final_selection_items.selection_bucket WHEN 'final' THEN 1 ELSE 0 END,
+            photo_selection_overrides.override_label
          FROM final_selection_items
          JOIN latest_run ON latest_run.id = final_selection_items.run_id
          JOIN photos ON photos.id = final_selection_items.photo_id
@@ -591,6 +593,7 @@ pub fn list_final_selection_photos(
          LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
          LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
          LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         LEFT JOIN photo_selection_overrides ON photo_selection_overrides.photo_id = photos.id
          WHERE final_selection_items.selection_bucket = ?1
          ORDER BY final_selection_items.final_rank ASC
          LIMIT ?2",
@@ -621,6 +624,7 @@ pub fn list_final_selection_photos(
             confidence_score: row.get::<_, Option<f64>>(20)?,
             confidence_label: row.get::<_, Option<String>>(21)?,
             album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+            override_label: row.get::<_, Option<String>>(23)?,
         })
     })?;
 
@@ -662,7 +666,8 @@ pub fn list_project_photos(
             photo_curation_scores.selection_reason,
             photo_curation_recommendations.confidence_score,
             photo_curation_recommendations.confidence_label,
-            photo_curation_recommendations.album_candidate
+            photo_curation_recommendations.album_candidate,
+            photo_selection_overrides.override_label
          FROM photos
          LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
          LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
@@ -672,6 +677,7 @@ pub fn list_project_photos(
          LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
          LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
          LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         LEFT JOIN photo_selection_overrides ON photo_selection_overrides.photo_id = photos.id
          ORDER BY COALESCE(photos.modified_at, '') DESC, photos.filename ASC
          LIMIT ?1 OFFSET ?2",
     )?;
@@ -701,6 +707,7 @@ pub fn list_project_photos(
             confidence_score: row.get::<_, Option<f64>>(20)?,
             confidence_label: row.get::<_, Option<String>>(21)?,
             album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+            override_label: row.get::<_, Option<String>>(23)?,
         })
     })?;
 
@@ -743,7 +750,8 @@ pub fn list_album_candidate_photos(
             photo_curation_scores.selection_reason,
             photo_curation_recommendations.confidence_score,
             photo_curation_recommendations.confidence_label,
-            photo_curation_recommendations.album_candidate
+            photo_curation_recommendations.album_candidate,
+            photo_selection_overrides.override_label
          FROM photos
          LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
          LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
@@ -753,6 +761,7 @@ pub fn list_album_candidate_photos(
          LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
          LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
          LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         LEFT JOIN photo_selection_overrides ON photo_selection_overrides.photo_id = photos.id
          WHERE photo_curation_recommendations.album_candidate = 1
          ORDER BY photo_curation_recommendations.confidence_score DESC, photo_curation_scores.ranking_score DESC, photos.filename ASC
          LIMIT ?1",
@@ -783,6 +792,7 @@ pub fn list_album_candidate_photos(
             confidence_score: row.get::<_, Option<f64>>(20)?,
             confidence_label: row.get::<_, Option<String>>(21)?,
             album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+            override_label: row.get::<_, Option<String>>(23)?,
         })
     })?;
 
@@ -825,7 +835,8 @@ pub fn list_review_queue_photos(
             photo_curation_scores.selection_reason,
             photo_curation_recommendations.confidence_score,
             photo_curation_recommendations.confidence_label,
-            photo_curation_recommendations.album_candidate
+            photo_curation_recommendations.album_candidate,
+            photo_selection_overrides.override_label
          FROM photos
          LEFT JOIN thumbnails ON thumbnails.photo_id = photos.id
          LEFT JOIN photo_quality_metrics ON photo_quality_metrics.photo_id = photos.id
@@ -835,6 +846,7 @@ pub fn list_review_queue_photos(
          LEFT JOIN duplicate_groups ON duplicate_groups.id = duplicate_members.group_id AND duplicate_groups.grouping_type = 'duplicate'
          LEFT JOIN duplicate_group_members AS burst_members ON burst_members.photo_id = photos.id
          LEFT JOIN duplicate_groups AS burst_groups ON burst_groups.id = burst_members.group_id AND burst_groups.grouping_type = 'burst'
+         LEFT JOIN photo_selection_overrides ON photo_selection_overrides.photo_id = photos.id
          WHERE photo_curation_scores.selection_label = 'review'
             OR photo_curation_recommendations.confidence_label IN ('medium', 'low')
          ORDER BY
@@ -870,6 +882,7 @@ pub fn list_review_queue_photos(
             confidence_score: row.get::<_, Option<f64>>(20)?,
             confidence_label: row.get::<_, Option<String>>(21)?,
             album_candidate: row.get::<_, Option<i64>>(22)?.unwrap_or(0) != 0,
+            override_label: row.get::<_, Option<String>>(23)?,
         })
     })?;
 

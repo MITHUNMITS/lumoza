@@ -6,7 +6,7 @@ import type { ProjectPhoto } from "../../types/project";
 import { EmptyState } from "../ui/EmptyState";
 import { SkeletonLoader } from "../ui/SkeletonLoader";
 import { StatusPill } from "../ui/StatusPill";
-import { ThumbnailCard } from "../ui/ThumbnailCard";
+import { ThumbnailCard, type PhotoOverrideAction } from "../ui/ThumbnailCard";
 
 interface ProjectPhotoGridProps {
   photos: ProjectPhoto[];
@@ -15,6 +15,7 @@ interface ProjectPhotoGridProps {
   hasMore: boolean;
   error?: string;
   onLoadMore: () => void;
+  onSetPhotoOverride?: (photoId: string, overrideLabel: PhotoOverrideAction) => void;
 }
 
 const GRID_GAP = 18;
@@ -64,7 +65,7 @@ function LoadingGrid() {
   );
 }
 
-export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, error, onLoadMore }: ProjectPhotoGridProps) {
+export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, error, onLoadMore, onSetPhotoOverride }: ProjectPhotoGridProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const loadMoreLock = useRef(false);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -162,7 +163,7 @@ export function ProjectPhotoGrid({ photos, isLoading, isLoadingMore, hasMore, er
           <div ref={viewportRef} className="lumoza-scrollbar relative min-h-0 flex-1 overflow-y-auto rounded-[26px] bg-ink/30 p-3">
             <div style={{ height: totalHeight > 0 ? `${totalHeight}px` : `${CARD_HEIGHT}px`, position: "relative" }}>
               {virtualItems.map(({ photo, style }) => (
-                <ThumbnailCard key={photo.id} photo={photo} previewSrc={resolvePreviewSrc(photo)} style={style} height={CARD_HEIGHT} previewHeight={PREVIEW_HEIGHT} />
+                <ThumbnailCard key={photo.id} photo={photo} previewSrc={resolvePreviewSrc(photo)} style={style} height={CARD_HEIGHT} previewHeight={PREVIEW_HEIGHT} onSetOverride={onSetPhotoOverride} />
               ))}
             </div>
           </div>

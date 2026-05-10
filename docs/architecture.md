@@ -530,4 +530,4 @@ The Python sidecar now advertises local Phase 3 readiness, while the Rust fast p
 
 ## Phase 4 Extension Note
 
-Phase 4 has started with a persisted smart-selection model. The database now tracks selection runs, final/review/rejected items, and user photo overrides. The local selector combines Phase 2 quality/confidence signals with Phase 3 people priority, face/group coverage, duplicate/burst diversity, and protect/include/exclude overrides to build a refilterable final album foundation.
+Phase 4 now has a persisted smart-selection model plus workspace controls for selection-set browsing, target-count refiltering, and protect/include/exclude metadata overrides. The database tracks selection runs, final/review/rejected items, and user photo overrides. The local selector combines Phase 2 quality/confidence signals with Phase 3 people priority, face/group coverage, duplicate/burst diversity, and protect/include/exclude overrides to build a refilterable final album foundation without rescanning original folders.

@@ -3,13 +3,14 @@ import { Aperture, CalendarDays, FolderOpen, GitCompare, Images, Map, Search, Se
 import { AppShell } from "../components/layout/AppShell";
 import { LumozaButton } from "../components/ui/LumozaButton";
 import { LumozaLogo } from "../components/ui/LumozaLogo";
+import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { StartupSplash } from "../components/splash/StartupSplash";
 import { ProjectDashboard } from "../pages/ProjectDashboard";
 import { OperationsPage } from "../pages/OperationsPage";
 import { ProjectWorkspace } from "../pages/ProjectWorkspace";
 import { SettingsPage } from "../pages/SettingsPage";
 import { StudioPage } from "../pages/StudioPage";
-import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getProjectSelectionSummary, getQualityAnalysisTask, getSmartSelectionTask, listProjectGroupSummaries, listProjectPeople, mergeProjectPeople, splitProjectPersonFace, startPeopleAnalysis, startQualityAnalysis, startSmartSelection, updateProjectPerson } from "../services/analysisService";
+import { getPeopleAnalysisTask, getProjectAnalysisSummary, getProjectPeopleSummary, getProjectSelectionSummary, getQualityAnalysisTask, getSmartSelectionTask, listProjectGroupSummaries, listProjectPeople, mergeProjectPeople, splitProjectPersonFace, setPhotoSelectionOverride, startPeopleAnalysis, startQualityAnalysis, startSmartSelection, updateProjectPerson } from "../services/analysisService";
 import { listAlbumCandidatePhotos, listFinalSelectionPhotos, listProjectPhotos, listReviewQueuePhotos } from "../services/photoService";
 import { createProject, listProjects } from "../services/projectService";
 import { cancelScan, getScanTask, pauseScan, resumeScan, startScan } from "../services/scanService";
@@ -21,6 +22,7 @@ import type { CreateProjectInput, CurationGroupSummary, ProjectAnalysisSummary, 
 import type { PeopleAnalysisTask, QualityAnalysisTask, ScanTask, SmartSelectionTask, SystemStatus } from "../types/system";
 
 const PHOTO_PAGE_SIZE = 180;
+type SelectionBucket = "all" | "final" | "review" | "rejected";
 
 function isTerminal(task?: ScanTask | QualityAnalysisTask | PeopleAnalysisTask | SmartSelectionTask) {
   return task ? task.status === "completed" || task.status === "cancelled" || task.status === "error" : false;
@@ -37,6 +39,11 @@ export function App() {
   const [people, setPeople] = useState<ProjectPerson[]>([]);
   const [selectionSummary, setSelectionSummary] = useState<ProjectSelectionSummary | undefined>();
   const [finalSelectionPhotos, setFinalSelectionPhotos] = useState<ProjectPhoto[]>([]);
+  const [selectionBucketPhotos, setSelectionBucketPhotos] = useState<ProjectPhoto[]>([]);
+  const [selectionBucket, setSelectionBucket] = useState<SelectionBucket>("all");
+  const [finalCountTarget, setFinalCountTarget] = useState(300);
+  const [reviewCountTarget, setReviewCountTarget] = useState(1000);
+  const [isLoadingSelectionBucket, setIsLoadingSelectionBucket] = useState(false);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isLoadingMorePhotos, setIsLoadingMorePhotos] = useState(false);
   const [hasMorePhotos, setHasMorePhotos] = useState(false);
@@ -116,6 +123,11 @@ export function App() {
       setPeople([]);
       setSelectionSummary(undefined);
       setFinalSelectionPhotos([]);
+      setSelectionBucketPhotos([]);
+      setSelectionBucket("all");
+      setFinalCountTarget(300);
+      setReviewCountTarget(1000);
+      setIsLoadingSelectionBucket(false);
       setIsLoadingMorePhotos(false);
       setHasMorePhotos(false);
       setPhotoError(undefined);
@@ -125,6 +137,8 @@ export function App() {
     let cancelled = false;
     setIsLoadingPhotos(true);
     setIsLoadingMorePhotos(false);
+    setSelectionBucket("all");
+    setSelectionBucketPhotos([]);
     setPhotoError(undefined);
 
     void Promise.all([
@@ -151,6 +165,8 @@ export function App() {
         setPeople(projectPeople);
         setSelectionSummary(selection);
         setFinalSelectionPhotos(finalSelection);
+        setFinalCountTarget(selection.finalCountTarget || 300);
+        setReviewCountTarget(selection.reviewCountTarget || 1000);
         setHasMorePhotos(photos.length === PHOTO_PAGE_SIZE);
       })
       .catch((error) => {
@@ -410,6 +426,14 @@ export function App() {
           if (!cancelled) {
             setSelectionSummary(selection);
             setFinalSelectionPhotos(finalSelection);
+            setFinalCountTarget(selection.finalCountTarget || finalCountTarget);
+            setReviewCountTarget(selection.reviewCountTarget || reviewCountTarget);
+            if (selectionBucket !== "all") {
+              const bucketPhotos = await listFinalSelectionPhotos(nextTask.projectId, selectionBucket, 300);
+              if (!cancelled) {
+                setSelectionBucketPhotos(bucketPhotos);
+              }
+            }
             addActivity({
               id: crypto.randomUUID(),
               eventType: nextTask.status === "error" ? "smart_selection_failed" : "smart_selection_completed",
@@ -706,13 +730,90 @@ export function App() {
   }
 
 
+
+  function applyPhotoOverride(photoId: string, overrideLabel: PhotoOverrideAction) {
+    const normalized = overrideLabel === "clear" ? undefined : overrideLabel;
+    const updatePhoto = (photo: ProjectPhoto): ProjectPhoto => photo.id === photoId ? { ...photo, overrideLabel: normalized } : photo;
+    setProjectPhotos((photos) => photos.map(updatePhoto));
+    setAlbumCandidates((photos) => photos.map(updatePhoto));
+    setReviewQueue((photos) => photos.map(updatePhoto));
+    setFinalSelectionPhotos((photos) => photos.map(updatePhoto));
+    setSelectionBucketPhotos((photos) => photos.map(updatePhoto));
+  }
+
+  async function refreshSelectionViews(projectId: string, bucket: SelectionBucket = selectionBucket) {
+    const [selection, finalSelection] = await Promise.all([
+      getProjectSelectionSummary(projectId),
+      listFinalSelectionPhotos(projectId, "final", 12),
+    ]);
+    setSelectionSummary(selection);
+    setFinalSelectionPhotos(finalSelection);
+    setFinalCountTarget(selection.finalCountTarget || finalCountTarget);
+    setReviewCountTarget(selection.reviewCountTarget || reviewCountTarget);
+
+    if (bucket !== "all") {
+      const bucketPhotos = await listFinalSelectionPhotos(projectId, bucket, 300);
+      setSelectionBucketPhotos(bucketPhotos);
+    }
+  }
+
+  async function handleSelectionBucketChange(bucket: SelectionBucket) {
+    setSelectionBucket(bucket);
+    if (!currentProject) {
+      return;
+    }
+    if (bucket === "all") {
+      setSelectionBucketPhotos([]);
+      return;
+    }
+    setIsLoadingSelectionBucket(true);
+    try {
+      const photos = await listFinalSelectionPhotos(currentProject.projectId, bucket, 300);
+      setSelectionBucketPhotos(photos);
+      setPhotoError(undefined);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Failed to load selection bucket.");
+    } finally {
+      setIsLoadingSelectionBucket(false);
+    }
+  }
+
+  function handleFinalCountTargetChange(value: number) {
+    setFinalCountTarget(Number.isFinite(value) ? Math.max(1, Math.min(10000, Math.round(value))) : 300);
+  }
+
+  function handleReviewCountTargetChange(value: number) {
+    setReviewCountTarget(Number.isFinite(value) ? Math.max(0, Math.min(20000, Math.round(value))) : 1000);
+  }
+
+  async function handleSetPhotoOverride(photoId: string, overrideLabel: PhotoOverrideAction) {
+    if (!currentProject) {
+      return;
+    }
+
+    applyPhotoOverride(photoId, overrideLabel);
+    try {
+      const selection = await setPhotoSelectionOverride(currentProject.projectId, photoId, overrideLabel);
+      setSelectionSummary(selection);
+      addActivity({
+        id: crypto.randomUUID(),
+        eventType: "selection_override_saved",
+        severity: "info",
+        message: overrideLabel === "clear" ? "Selection override cleared. Refilter to refresh the album." : "Selection override saved. Refilter to refresh the album.",
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Failed to save selection override.");
+    }
+  }
+
   async function handleStartSmartSelection() {
     if (!currentProject) {
       return;
     }
 
     try {
-      const task = await startSmartSelection(currentProject.projectId, { finalCountTarget: 300, reviewCountTarget: 1000 });
+      const task = await startSmartSelection(currentProject.projectId, { finalCountTarget, reviewCountTarget });
       setActiveSelectionTask(task);
       addActivity({
         id: crypto.randomUUID(),
@@ -723,12 +824,7 @@ export function App() {
       });
 
       if (isTerminal(task)) {
-        const [selection, finalSelection] = await Promise.all([
-          getProjectSelectionSummary(currentProject.projectId),
-          listFinalSelectionPhotos(currentProject.projectId, "final", 12),
-        ]);
-        setSelectionSummary(selection);
-        setFinalSelectionPhotos(finalSelection);
+        await refreshSelectionViews(currentProject.projectId);
       }
     } catch (error) {
       const task: SmartSelectionTask = {
@@ -738,8 +834,8 @@ export function App() {
         progressCurrent: 0,
         progressTotal: 0,
         message: error instanceof Error ? error.message : "Smart selection failed.",
-        finalCountTarget: 300,
-        reviewCountTarget: 1000,
+        finalCountTarget,
+        reviewCountTarget,
         selectedCount: 0,
         reviewCount: 0,
         rejectedCount: 0,
@@ -871,13 +967,18 @@ export function App() {
     </div>
   );
 
+  const workspacePhotos = selectionBucket === "all" ? projectPhotos : selectionBucketPhotos;
+  const workspaceHasMorePhotos = selectionBucket === "all" ? hasMorePhotos : false;
+  const workspaceIsLoadingPhotos = selectionBucket === "all" ? isLoadingPhotos : isLoadingSelectionBucket;
+  const workspaceIsLoadingMorePhotos = selectionBucket === "all" ? isLoadingMorePhotos : false;
+
   let content = <ProjectDashboard projects={projects} onOpenProject={handleOpenProject} onCreateProject={handleCreateProject} />;
 
   if (currentView === "workspace" && currentProject) {
     content = (
       <ProjectWorkspace
         project={currentProject}
-        photos={projectPhotos}
+        photos={workspacePhotos}
         albumCandidates={albumCandidates}
         reviewQueue={reviewQueue}
         groupSummaries={groupSummaries}
@@ -885,15 +986,22 @@ export function App() {
         peopleSummary={peopleSummary}
         selectionSummary={selectionSummary}
         finalSelectionPhotos={finalSelectionPhotos}
-        isLoadingPhotos={isLoadingPhotos}
-        isLoadingMorePhotos={isLoadingMorePhotos}
-        hasMorePhotos={hasMorePhotos}
+        selectionBucket={selectionBucket}
+        finalCountTarget={finalCountTarget}
+        reviewCountTarget={reviewCountTarget}
+        isLoadingPhotos={workspaceIsLoadingPhotos}
+        isLoadingMorePhotos={workspaceIsLoadingMorePhotos}
+        hasMorePhotos={workspaceHasMorePhotos}
         photoError={photoError}
         task={activeTask}
         analysisTask={activeAnalysisTask}
         selectionTask={activeSelectionTask}
         activity={activity}
-        onLoadMorePhotos={handleLoadMorePhotos}
+        onLoadMorePhotos={selectionBucket === "all" ? handleLoadMorePhotos : () => undefined}
+        onSelectionBucketChange={handleSelectionBucketChange}
+        onFinalCountTargetChange={handleFinalCountTargetChange}
+        onReviewCountTargetChange={handleReviewCountTargetChange}
+        onSetPhotoOverride={handleSetPhotoOverride}
         onStartScan={handleStartScan}
         onStartAnalysis={handleStartAnalysis}
         onStartSmartSelection={handleStartSmartSelection}

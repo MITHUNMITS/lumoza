@@ -6,7 +6,7 @@ Deliver a stable, premium-feeling desktop foundation for local project creation,
 
 Phase 1 progress: 100% complete
 
-Full product progress: 69% overall
+Full product progress: 73% overall
 
 ## Phase 1 Deliverables
 

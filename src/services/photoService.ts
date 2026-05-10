@@ -1,6 +1,6 @@
 import { invokeOrMock } from "./tauriCommands";
 import { listProjects } from "./projectService";
-import type { ProjectPhoto } from "../types/project";
+import type { ProjectPhoto, SelectionOverrideLabel } from "../types/project";
 
 export interface ListProjectPhotosOptions {
   offset?: number;
@@ -30,6 +30,7 @@ interface RawProjectPhoto {
   selectionReason?: string;
   confidenceScore?: number;
   confidenceLabel?: "high" | "medium" | "low";
+  overrideLabel?: SelectionOverrideLabel;
   albumCandidate?: boolean;
 }
 
@@ -61,6 +62,7 @@ function createMockPhotos(projectId: string, count: number): ProjectPhoto[] {
     selectionReason: index % 7 < 2 ? "strong technical quality; standalone frame; high confidence" : index % 7 < 5 ? "usable technical quality; secondary burst frame; medium confidence" : "weak technical quality; lower-ranked duplicate frame; low confidence",
     confidenceScore: 0.52 + (index % 5) * 0.09,
     confidenceLabel: index % 5 > 2 ? "high" : index % 5 > 0 ? "medium" : "low",
+    overrideLabel: index === 0 ? "protect" : undefined,
     albumCandidate: index % 7 < 2 && index % 5 > 2,
   }));
 }
@@ -84,6 +86,7 @@ function mapPhoto(photo: RawProjectPhoto): ProjectPhoto {
     selectionReason: photo.selectionReason,
     confidenceScore: photo.confidenceScore,
     confidenceLabel: photo.confidenceLabel,
+    overrideLabel: photo.overrideLabel,
     albumCandidate: photo.albumCandidate ?? false,
     quality:
       photo.overallScore === undefined &&

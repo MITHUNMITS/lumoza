@@ -81,6 +81,7 @@ export interface ProjectPhotoQualitySummary {
 
 export type SelectionLabel = "keep" | "review" | "reject";
 export type ConfidenceLabel = "high" | "medium" | "low";
+export type SelectionOverrideLabel = "force_include" | "force_exclude" | "protect";
 
 export interface ProjectPhoto {
   id: string;
@@ -101,6 +102,7 @@ export interface ProjectPhoto {
   selectionReason?: string;
   confidenceScore?: number;
   confidenceLabel?: ConfidenceLabel;
+  overrideLabel?: SelectionOverrideLabel;
   albumCandidate: boolean;
 }
 

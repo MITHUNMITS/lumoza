@@ -1,10 +1,13 @@
-import { BrainCircuit, ScanLine, Sparkles, Trophy, UsersRound } from "lucide-react";
+import { BrainCircuit, ScanLine, SlidersHorizontal, Sparkles, Trophy, UsersRound } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
+import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { LumozaButton } from "../components/ui/LumozaButton";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSelectionSummary, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask, SmartSelectionTask } from "../types/system";
+
+type SelectionBucket = "all" | "final" | "review" | "rejected";
 
 interface ProjectWorkspaceProps {
   project: ProjectSummary;
@@ -16,6 +19,9 @@ interface ProjectWorkspaceProps {
   peopleSummary?: ProjectPeopleSummary;
   selectionSummary?: ProjectSelectionSummary;
   finalSelectionPhotos: ProjectPhoto[];
+  selectionBucket: SelectionBucket;
+  finalCountTarget: number;
+  reviewCountTarget: number;
   isLoadingPhotos: boolean;
   isLoadingMorePhotos: boolean;
   hasMorePhotos: boolean;
@@ -25,6 +31,10 @@ interface ProjectWorkspaceProps {
   selectionTask?: SmartSelectionTask;
   activity: ActivityItem[];
   onLoadMorePhotos: () => void;
+  onSelectionBucketChange: (bucket: SelectionBucket) => void;
+  onFinalCountTargetChange: (value: number) => void;
+  onReviewCountTargetChange: (value: number) => void;
+  onSetPhotoOverride: (photoId: string, overrideLabel: PhotoOverrideAction) => void;
   onStartScan: () => void;
   onStartAnalysis: () => void;
   onStartSmartSelection: () => void;
@@ -60,6 +70,9 @@ export function ProjectWorkspace({
   peopleSummary,
   selectionSummary,
   finalSelectionPhotos,
+  selectionBucket,
+  finalCountTarget,
+  reviewCountTarget,
   isLoadingPhotos,
   isLoadingMorePhotos,
   hasMorePhotos,
@@ -69,6 +82,10 @@ export function ProjectWorkspace({
   selectionTask,
   activity,
   onLoadMorePhotos,
+  onSelectionBucketChange,
+  onFinalCountTargetChange,
+  onReviewCountTargetChange,
+  onSetPhotoOverride,
   onStartScan,
   onStartAnalysis,
   onStartSmartSelection,
@@ -87,11 +104,18 @@ export function ProjectWorkspace({
   const visibleAlbumCandidates = albumCandidates.slice(0, 4);
   const visibleFinalSelection = finalSelectionPhotos.slice(0, 4);
   const selectedCount = selectionTask?.selectedCount ?? selectionSummary?.selectedCount ?? 0;
-  const finalTarget = selectionTask?.finalCountTarget ?? selectionSummary?.finalCountTarget ?? 300;
+  const finalTarget = selectionTask?.finalCountTarget ?? finalCountTarget;
   const selectionReviewCount = selectionTask?.reviewCount ?? selectionSummary?.reviewCount ?? 0;
   const protectedCount = selectionTask?.protectedCount ?? selectionSummary?.protectedCount ?? 0;
   const latestActivity = activity.slice(0, 3);
   const activeGroups = groupSummaries.slice(0, 4);
+  const buckets: Array<{ id: SelectionBucket; label: string; count: number }> = [
+    { id: "all", label: "All", count: project.photoCount || photos.length },
+    { id: "final", label: "Final", count: selectedCount },
+    { id: "review", label: "Review", count: selectionReviewCount },
+    { id: "rejected", label: "Rejected", count: selectionSummary?.rejectedCount ?? selectionTask?.rejectedCount ?? 0 },
+  ];
+
 
   return (
     <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -114,6 +138,25 @@ export function ProjectWorkspace({
           </div>
         </div>
 
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-[26px] bg-white/[0.035] px-3 py-3 shadow-soft">
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <SlidersHorizontal className="h-4 w-4 text-accent" />
+            <span>Review set</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {buckets.map((bucket) => (
+              <button
+                key={bucket.id}
+                type="button"
+                onClick={() => onSelectionBucketChange(bucket.id)}
+                className={`lumoza-focus rounded-full px-3 py-1.5 text-xs transition duration-200 ${selectionBucket === bucket.id ? "bg-accent/18 text-text shadow-glow" : "bg-white/[0.045] text-subtle hover:bg-white/[0.08] hover:text-text"}`}
+              >
+                {bucket.label} <span className="font-mono text-[11px] opacity-70">{bucket.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <ProjectPhotoGrid
           photos={photos}
           isLoading={isLoadingPhotos}
@@ -121,6 +164,7 @@ export function ProjectWorkspace({
           hasMore={hasMorePhotos}
           error={photoError}
           onLoadMore={onLoadMorePhotos}
+          onSetPhotoOverride={onSetPhotoOverride}
         />
       </section>
 
@@ -140,7 +184,31 @@ export function ProjectWorkspace({
             <CompactStat label="Runs" value={selectionSummary?.selectionRunCount ?? 0} />
           </div>
           {selectionTask ? <p className="mt-4 line-clamp-2 text-xs leading-5 text-muted">{selectionTask.message}</p> : null}
-          <LumozaButton type="button" variant="primary" className="mt-4 w-full" disabled={selectionTask?.status === "running"} onClick={onStartSmartSelection}>Build final album</LumozaButton>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <label className="space-y-1 rounded-2xl bg-white/[0.04] px-3 py-2 text-xs text-subtle">
+              <span>Final target</span>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={finalCountTarget}
+                onChange={(event) => onFinalCountTargetChange(Number(event.target.value))}
+                className="lumoza-focus w-full bg-transparent font-mono text-sm text-text outline-none"
+              />
+            </label>
+            <label className="space-y-1 rounded-2xl bg-white/[0.04] px-3 py-2 text-xs text-subtle">
+              <span>Review target</span>
+              <input
+                type="number"
+                min={0}
+                max={20000}
+                value={reviewCountTarget}
+                onChange={(event) => onReviewCountTargetChange(Number(event.target.value))}
+                className="lumoza-focus w-full bg-transparent font-mono text-sm text-text outline-none"
+              />
+            </label>
+          </div>
+          <LumozaButton type="button" variant="primary" className="mt-4 w-full" disabled={selectionTask?.status === "running"} onClick={onStartSmartSelection}>Refilter album</LumozaButton>
           <div className="mt-4 space-y-2">
             {visibleFinalSelection.length === 0 ? <p className="text-sm text-subtle">Run smart selection for final memories.</p> : null}
             {visibleFinalSelection.map((photo) => (

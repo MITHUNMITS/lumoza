@@ -53,6 +53,7 @@ pub struct ProjectPhotoResponse {
     pub selection_reason: Option<String>,
     pub confidence_score: Option<f64>,
     pub confidence_label: Option<String>,
+    pub override_label: Option<String>,
     pub album_candidate: bool,
 }
 
@@ -220,6 +221,7 @@ fn map_project_photo_response(photo: database::ProjectPhotoRecord) -> ProjectPho
         selection_reason: photo.selection_reason,
         confidence_score: photo.confidence_score,
         confidence_label: photo.confidence_label,
+        override_label: photo.override_label,
         album_candidate: photo.album_candidate,
     }
 }
