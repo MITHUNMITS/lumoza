@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrainCircuit, CheckCircle2, Minus, Plus, RotateCcw, ScanLine, ShieldCheck, SlidersHorizontal, Sparkles, Trophy, UsersRound, XCircle } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Eye, Minus, Plus, RotateCcw, ScanLine, ShieldCheck, SlidersHorizontal, Sparkles, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
 import { LumozaButton } from "../components/ui/LumozaButton";
+import { LumozaDialog } from "../components/ui/LumozaDialog";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { CurationGroupSummary, ProjectAnalysisSummary, ProjectPeopleSummary, ProjectPhoto, ProjectSelectionSummary, ProjectSummary } from "../types/project";
 import type { ActivityItem, QualityAnalysisTask, ScanTask, SmartSelectionTask } from "../types/system";
@@ -61,6 +62,60 @@ function CompactStat({ label, value }: { label: string; value: string | number }
   );
 }
 
+function formatFileSize(bytes?: number) {
+  if (!bytes) return "Unknown";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function scorePercent(value?: number) {
+  return value === undefined ? "--" : `${Math.round(value * 100)}%`;
+}
+
+function PhotoDetailDialog({ photo, open, onClose, onApplyOverride }: { photo?: ProjectPhoto; open: boolean; onClose: () => void; onApplyOverride: (overrideLabel: PhotoOverrideAction) => void }) {
+  return (
+    <LumozaDialog open={open && Boolean(photo)} title={photo?.filename ?? "Photo viewer"} subtitle="AI details, metadata, and review actions." size="wide" onClose={onClose}>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-h-[420px] overflow-hidden rounded-[28px] lumoza-memory-frame shadow-panel">
+          <div className="flex h-full min-h-[420px] items-end bg-gradient-to-t from-ink/88 via-transparent to-transparent p-5">
+            <div>
+              <StatusPill tone={photo?.selectionLabel === "keep" ? "success" : photo?.selectionLabel === "reject" ? "danger" : "purple"}>{photo?.selectionLabel ?? "review"}</StatusPill>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-muted">{photo?.selectionReason ?? "Lumoza keeps the original file untouched and stores only local metadata, thumbnails, and curation signals."}</p>
+            </div>
+          </div>
+        </div>
+        <aside className="space-y-4">
+          <section className="rounded-[24px] bg-white/[0.045] p-4">
+            <p className="text-sm text-text">Photo details</p>
+            <div className="mt-4 space-y-2 text-sm text-muted">
+              <div className="flex justify-between gap-3"><span>Type</span><span className="text-text">{photo?.extension?.toUpperCase() ?? "--"}</span></div>
+              <div className="flex justify-between gap-3"><span>Size</span><span className="text-text">{formatFileSize(photo?.fileSizeBytes)}</span></div>
+              <div className="flex justify-between gap-3"><span>Dimensions</span><span className="text-text">{photo?.width && photo.height ? `${photo.width} x ${photo.height}` : "--"}</span></div>
+              <div className="flex justify-between gap-3"><span>Confidence</span><span className="text-text">{scorePercent(photo?.confidenceScore)}</span></div>
+              <div className="flex justify-between gap-3"><span>Rank</span><span className="text-text">{scorePercent(photo?.rankingScore)}</span></div>
+            </div>
+          </section>
+          <section className="rounded-[24px] bg-white/[0.045] p-4">
+            <p className="text-sm text-text">AI analysis</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <CompactStat label="Sharp" value={scorePercent(photo?.quality?.sharpnessScore)} />
+              <CompactStat label="Exposure" value={scorePercent(photo?.quality?.exposureScore)} />
+              <CompactStat label="Contrast" value={scorePercent(photo?.quality?.contrastScore)} />
+              <CompactStat label="Overall" value={scorePercent(photo?.quality?.overallScore)} />
+            </div>
+          </section>
+          <div className="grid grid-cols-2 gap-2">
+            <LumozaButton type="button" variant="secondary" onClick={() => onApplyOverride("protect")}>Protect</LumozaButton>
+            <LumozaButton type="button" variant="secondary" onClick={() => onApplyOverride("force_include")}>Keep</LumozaButton>
+            <LumozaButton type="button" variant="secondary" onClick={() => onApplyOverride("force_exclude")}>Reject</LumozaButton>
+            <LumozaButton type="button" variant="ghost" onClick={() => onApplyOverride("clear")}>Clear</LumozaButton>
+          </div>
+        </aside>
+      </div>
+    </LumozaDialog>
+  );
+}
+
 export function ProjectWorkspace({
   project,
   photos,
@@ -95,6 +150,7 @@ export function ProjectWorkspace({
   onCancel,
 }: ProjectWorkspaceProps) {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | undefined>();
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const selectedPhoto = useMemo(() => photos.find((photo) => photo.id === selectedPhotoId) ?? photos[0], [photos, selectedPhotoId]);
 
   useEffect(() => {
@@ -153,6 +209,9 @@ export function ProjectWorkspace({
       } else if (event.key.toLowerCase() === "c") {
         event.preventDefault();
         applySelectedOverride("clear");
+      } else if (event.key === " " || event.key.toLowerCase() === "v") {
+        event.preventDefault();
+        setIsPhotoViewerOpen(true);
       }
     };
 
@@ -188,6 +247,11 @@ export function ProjectWorkspace({
     { label: "Missing moments", value: Math.max(18, Math.round((peopleSummary?.clusteredPeopleCount ?? 0) * 2)) },
     { label: "Overexposed", value: Math.max(24, Math.round((analysisSummary?.rejectCount ?? 0) / 2)) },
   ];
+  const curationCollections = [
+    { label: "Review Collection", value: selectionReviewCount || reviewQueue.length || 1000, tone: "purple" },
+    { label: "Recommended Final", value: selectedCount || finalCountTarget, tone: "accent" },
+    { label: "Low Confidence", value: Math.max(0, reviewCount || selectionReviewCount), tone: "muted" },
+  ];
   const finalCoverage = [
     "All important people covered",
     "Great variety of moments",
@@ -198,7 +262,12 @@ export function ProjectWorkspace({
 
 
   return (
-    <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+    <>
+      <PhotoDetailDialog photo={selectedPhoto} open={isPhotoViewerOpen} onClose={() => setIsPhotoViewerOpen(false)} onApplyOverride={(overrideLabel) => {
+        applySelectedOverride(overrideLabel);
+        setIsPhotoViewerOpen(false);
+      }} />
+      <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <section className="flex min-w-0 min-h-0 flex-col gap-4">
         <div className="relative shrink-0 overflow-hidden rounded-[30px] bg-ink/34 p-4 shadow-soft">
           <div className="absolute right-0 top-0 h-28 w-56 rounded-full bg-accent/10 blur-3xl" />
@@ -217,6 +286,29 @@ export function ProjectWorkspace({
             </div>
           </div>
         </div>
+
+        {selectionBucket === "all" ? (
+          <section className="relative shrink-0 overflow-hidden rounded-[30px] border border-purple/18 bg-white/[0.035] p-5 shadow-panel">
+            <div className="absolute left-8 top-0 h-32 w-32 rounded-full bg-purple/18 blur-3xl" />
+            <div className="relative text-center">
+              <StatusPill tone="purple">09 Intelligent Curation</StatusPill>
+              <h3 className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-text">AI has prepared your collections</h3>
+              <p className="mt-1 text-sm text-muted">Review the AI-suggested collections before final curation.</p>
+            </div>
+            <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
+              {curationCollections.map((collection) => (
+                <button key={collection.label} type="button" className="lumoza-focus rounded-[24px] border border-white/8 bg-white/[0.045] p-5 text-center transition hover:border-purple/40 hover:bg-purple/10 hover:shadow-glow">
+                  <p className="text-sm text-muted">{collection.label}</p>
+                  <p className="mt-3 font-mono text-4xl font-semibold text-text">{collection.value}</p>
+                  <p className="mt-1 text-xs text-subtle">Photos</p>
+                </button>
+              ))}
+            </div>
+            <div className="relative mt-5 flex justify-center">
+              <LumozaButton type="button" variant="primary" onClick={onStartSmartSelection} disabled={selectionTask?.status === "running"}>Review collections</LumozaButton>
+            </div>
+          </section>
+        ) : null}
 
         {selectionBucket === "review" ? (
           <section className="relative shrink-0 overflow-hidden rounded-[30px] border border-purple/18 bg-white/[0.035] p-5 shadow-panel">
@@ -311,6 +403,7 @@ export function ProjectWorkspace({
             <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-purple/12 px-2.5 py-1.5 text-xs text-purple hover:bg-purple/18" disabled={!selectedPhoto} onClick={() => applySelectedOverride("protect")}><ShieldCheck className="h-3.5 w-3.5" /> P</button>
             <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-success/10 px-2.5 py-1.5 text-xs text-success hover:bg-success/15" disabled={!selectedPhoto} onClick={() => applySelectedOverride("force_include")}><CheckCircle2 className="h-3.5 w-3.5" /> I</button>
             <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-error/10 px-2.5 py-1.5 text-xs text-error hover:bg-error/15" disabled={!selectedPhoto} onClick={() => applySelectedOverride("force_exclude")}><XCircle className="h-3.5 w-3.5" /> X</button>
+            <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-white/[0.055] px-2.5 py-1.5 text-xs text-muted hover:text-text" disabled={!selectedPhoto} onClick={() => setIsPhotoViewerOpen(true)}><Eye className="h-3.5 w-3.5" /> V</button>
             <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-white/[0.055] px-2.5 py-1.5 text-xs text-muted hover:text-text" disabled={!selectedPhoto} onClick={() => applySelectedOverride("clear")}><RotateCcw className="h-3.5 w-3.5" /> C</button>
           </div>
         </div>
@@ -438,6 +531,7 @@ export function ProjectWorkspace({
           </div>
         </section>
       </aside>
-    </div>
+      </div>
+    </>
   );
 }

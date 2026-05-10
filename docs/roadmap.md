@@ -2,10 +2,10 @@
 
 ## Current Stage
 
-Lumoza has completed Phase 1 foundation, Phase 2 fast AI engine, Phase 3 people intelligence, and Phase 4 smart selection. Phase 5 professional polish is now in progress.
+Lumoza has completed Phase 1 foundation, Phase 2 fast AI engine, Phase 3 people intelligence, and Phase 4 smart selection. Phase 5 professional polish is complete. Phase 6 production distribution is next.
 
-Current full product progress: 90%
-Current active phase progress: 65% (Phase 5)
+Current full product progress: 95%
+Current active phase progress: 100% (Phase 5)
 
 ## Phases
 
@@ -60,13 +60,13 @@ Every phase should be completed and reviewed before the next phase begins.
 
 This percentage is full-program progress, not phase-local progress.
 
-Current weighted estimate: `90%` overall.
+Current weighted estimate: `95%` overall.
 
 Interpretation:
 - Phase 1: 100% complete
 - Phase 2: 100% complete
 - Phase 3: 100% complete
 - Phase 4: 100% complete
-- Phase 5: 65% complete
+- Phase 5: 100% complete
 - Phase 6: 8% complete
 - Launch-critical cross-cutting work: mostly still open

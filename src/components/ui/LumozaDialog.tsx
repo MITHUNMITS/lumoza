@@ -6,15 +6,22 @@ interface LumozaDialogProps extends PropsWithChildren {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  size?: "default" | "wide" | "immersive";
   onClose: () => void;
 }
 
-export function LumozaDialog({ open, title, subtitle, action, onClose, children }: LumozaDialogProps) {
+const dialogSizeClass = {
+  default: "max-w-2xl",
+  wide: "max-w-5xl",
+  immersive: "max-w-7xl",
+};
+
+export function LumozaDialog({ open, title, subtitle, action, size = "default", onClose, children }: LumozaDialogProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/72 p-6 backdrop-blur-xl">
       <div className="absolute inset-0 lumoza-photo-collage opacity-30" />
-      <section className="relative w-full max-w-2xl overflow-hidden rounded-[32px] border border-white/10 bg-panel/92 p-6 shadow-panel">
+      <section className={`relative max-h-[88vh] w-full overflow-hidden rounded-[32px] border border-white/10 bg-panel/92 p-6 shadow-panel ${dialogSizeClass[size]}`}>
         <div className="absolute right-0 top-0 h-44 w-56 rounded-full bg-purple/15 blur-3xl" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -25,7 +32,7 @@ export function LumozaDialog({ open, title, subtitle, action, onClose, children 
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="relative mt-6">{children}</div>
+        <div className="relative mt-6 min-h-0 overflow-y-auto lumoza-scrollbar">{children}</div>
         {action ? <div className="relative mt-6 flex justify-end">{action}</div> : null}
       </section>
     </div>

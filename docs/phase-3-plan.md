@@ -7,7 +7,7 @@ Add local people intelligence to Lumoza Studio: face detection readiness, face p
 Current phase status: complete
 
 Phase 3 progress: 100% complete
-Full product progress: 90% overall
+Full product progress: 95% overall
 
 Phase 3 is complete as a local-first people intelligence workflow. It ships a CPU face-candidate detector, cache-only face crops, lightweight embeddings, deterministic people clustering, persisted people data, people review UI, rename, priority, hide, merge, and split controls. Production-grade Face AI Pack accuracy is still reserved for Phase 6 model distribution.
 

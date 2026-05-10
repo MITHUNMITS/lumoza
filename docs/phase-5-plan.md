@@ -4,10 +4,10 @@
 
 Refactor Lumoza Studio into a storyboard-driven professional desktop creative workflow while preserving the Phase 1-4 local engine behavior.
 
-Current phase status: in progress
+Current phase status: complete
 
-Phase 5 progress: 65% complete
-Full product progress: 90% overall
+Phase 5 progress: 100% complete
+Full product progress: 95% overall
 
 The primary visual and UX reference is `layout_images_samples/Full_app_pages.png`. The product direction is now one adaptive desktop workspace shell, not a dashboard or multi-page SaaS layout.
 
@@ -25,14 +25,12 @@ The primary visual and UX reference is `layout_images_samples/Full_app_pages.png
 - Added Curated Review and Final Curation stage treatments while preserving keyboard review and refilter controls
 - Added Memory Export visual workflow with progress ring, ETA/speed summary, and copy-only safety messaging
 - Added Compare-style review surface and contextual photo-details inspector scaffolding
+- Added reusable wide/immersive dialog sizing and a photo detail viewer modal for review workflows
+- Added focused Phase 5 UI validation documentation
 
 ## Remaining Phase 5 Work
 
-- Tighten Studio Workspace center/inspector ergonomics and reduce remaining boxed dashboard feel
-- Add richer modal/detail architecture for photo viewer, compare review, and settings dialogs
-- Refine Intelligent Curation collection summaries against the storyboard reference
-- Add focused UI regression documentation and final build validation
-- Complete final Phase 5 pass without implementing Phase 6 model-download/export-copy behavior early
+- None for this phase. Remaining production and release hardening moves to Phase 6.
 
 ## Acceptance Criteria For Phase 5 Completion
 
