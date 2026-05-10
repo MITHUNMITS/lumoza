@@ -1937,4 +1937,117 @@ mod tests {
 
         cleanup_sqlite_files(&db_path);
     }
+
+    #[test]
+    fn selection_override_round_trip_and_refilter_replaces_latest_run() {
+        let db_path = temp_db_path("selection-refilter");
+        let connection = open_connection(&db_path).unwrap();
+        apply_migrations(&connection, &db_path).unwrap();
+        let now = Utc::now().to_rfc3339();
+
+        connection
+            .execute(
+                "INSERT INTO source_folders (id, absolute_path, scan_policy, created_at) VALUES ('source:test', '/tmp/source', 'recursive', ?1)",
+                params![now.as_str()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO photos (id, source_folder_id, absolute_path, filename, extension, file_size_bytes, modified_at, thumbnail_status, ingest_status)
+                 VALUES ('photo:1', 'source:test', '/tmp/source/one.jpg', 'one.jpg', 'jpg', 100, '2026-01-01T10:00:00Z', 'generated', 'indexed'),
+                        ('photo:2', 'source:test', '/tmp/source/two.jpg', 'two.jpg', 'jpg', 100, '2026-01-02T10:00:00Z', 'generated', 'indexed')",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        set_photo_selection_override(&db_path, "photo:1", "protect", None).unwrap();
+        let candidates = list_selection_candidate_records(&db_path).unwrap();
+        assert_eq!(
+            candidates
+                .iter()
+                .find(|candidate| candidate.photo_id == "photo:1")
+                .and_then(|candidate| candidate.override_label.as_deref()),
+            Some("protect")
+        );
+
+        set_photo_selection_override(&db_path, "photo:1", "clear", None).unwrap();
+        let candidates = list_selection_candidate_records(&db_path).unwrap();
+        assert_eq!(
+            candidates
+                .iter()
+                .find(|candidate| candidate.photo_id == "photo:1")
+                .and_then(|candidate| candidate.override_label.as_deref()),
+            None
+        );
+
+        let first_result = SmartSelectionResult {
+            items: vec![FinalSelectionItemRecord {
+                photo_id: "photo:1".to_string(),
+                selection_bucket: "final".to_string(),
+                final_rank: 1,
+                selection_score: 0.8,
+                quality_score: 0.8,
+                people_score: 0.0,
+                diversity_score: 0.7,
+                confidence_score: 0.8,
+                explanation: "first run".to_string(),
+                coverage_reason: "event coverage".to_string(),
+            }],
+            selected_count: 1,
+            review_count: 0,
+            rejected_count: 0,
+            protected_count: 0,
+        };
+        persist_smart_selection(&db_path, "run:1", 1, 1, 2, &first_result).unwrap();
+
+        let second_result = SmartSelectionResult {
+            items: vec![
+                FinalSelectionItemRecord {
+                    photo_id: "photo:2".to_string(),
+                    selection_bucket: "final".to_string(),
+                    final_rank: 1,
+                    selection_score: 0.9,
+                    quality_score: 0.9,
+                    people_score: 0.0,
+                    diversity_score: 0.7,
+                    confidence_score: 0.9,
+                    explanation: "second run".to_string(),
+                    coverage_reason: "event coverage".to_string(),
+                },
+                FinalSelectionItemRecord {
+                    photo_id: "photo:1".to_string(),
+                    selection_bucket: "rejected".to_string(),
+                    final_rank: 1,
+                    selection_score: 0.4,
+                    quality_score: 0.4,
+                    people_score: 0.0,
+                    diversity_score: 0.7,
+                    confidence_score: 0.4,
+                    explanation: "replaced by refilter".to_string(),
+                    coverage_reason: "story diversity".to_string(),
+                },
+            ],
+            selected_count: 1,
+            review_count: 0,
+            rejected_count: 1,
+            protected_count: 0,
+        };
+        persist_smart_selection(&db_path, "run:2", 1, 1, 2, &second_result).unwrap();
+
+        let summary = get_selection_summary(&db_path).unwrap();
+        assert_eq!(summary.selection_run_count, 1);
+        assert_eq!(summary.selected_count, 1);
+        assert_eq!(summary.rejected_count, 1);
+
+        let final_photos = list_final_selection_photos(&db_path, "final", 10).unwrap();
+        assert_eq!(final_photos.len(), 1);
+        assert_eq!(final_photos[0].id, "photo:2");
+        assert_eq!(
+            final_photos[0].selection_reason.as_deref(),
+            Some("second run")
+        );
+
+        cleanup_sqlite_files(&db_path);
+    }
 }
