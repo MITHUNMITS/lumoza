@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { CalendarDays, Download, Image, Map, SplitSquareHorizontal, Upload, UsersRound } from "lucide-react";
-import type { ProjectPerson, ProjectPhoto, ProjectPeopleSummary, ProjectSummary } from "../types/project";
+import type { ProjectPerson, ProjectPhoto, ProjectPeopleSummary, ProjectSelectionSummary, ProjectSummary } from "../types/project";
 import { LumozaButton } from "../components/ui/LumozaButton";
 import type { PeopleAnalysisTask } from "../types/system";
 
@@ -11,6 +11,8 @@ interface StudioPageProps {
   mode: "people" | "places" | "timeline" | "compare" | "import" | "export";
   project?: ProjectSummary;
   photos: ProjectPhoto[];
+  finalSelectionPhotos?: ProjectPhoto[];
+  selectionSummary?: ProjectSelectionSummary;
   peopleSummary?: ProjectPeopleSummary;
   people?: ProjectPerson[];
   peopleTask?: PeopleAnalysisTask;
@@ -160,10 +162,12 @@ function PeopleWorkspace({
   );
 }
 
-export function StudioPage({ title, subtitle, mode, project, photos, peopleSummary, people = [], peopleTask, onStartPeopleAnalysis, onUpdatePerson, onMergePeople, onSplitPersonFace }: StudioPageProps) {
+export function StudioPage({ title, subtitle, mode, project, photos, finalSelectionPhotos = [], selectionSummary, peopleSummary, people = [], peopleTask, onStartPeopleAnalysis, onUpdatePerson, onMergePeople, onSplitPersonFace }: StudioPageProps) {
   const Icon = icons[mode] ?? Image;
   const isImport = mode === "import";
   const isExport = mode === "export";
+  const exportPhotos = finalSelectionPhotos.length > 0 ? finalSelectionPhotos : photos.filter((photo) => photo.selectionLabel === "keep" || photo.albumCandidate).slice(0, 24);
+  const exportReadyCount = selectionSummary?.selectedCount ?? finalSelectionPhotos.length;
 
   return (
     <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -190,14 +194,32 @@ export function StudioPage({ title, subtitle, mode, project, photos, peopleSumma
               </div>
             </div>
           ) : isExport ? (
-            <div className="grid h-full gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="rounded-[26px] bg-white/[0.04] p-5">
-                <h2 className="text-xl font-semibold text-text">Export memories</h2>
-                <div className="mt-5 grid gap-3">
-                  {['Photos', 'Video', 'Album'].map((item) => <div key={item} className="rounded-2xl bg-white/[0.05] px-4 py-4 text-sm text-muted">{item}</div>)}
+            <div className="grid h-full gap-4 lg:grid-cols-[0.86fr_1.14fr]">
+              <div className="relative overflow-hidden rounded-[26px] bg-white/[0.04] p-5 shadow-soft">
+                <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-accent/12 blur-3xl" />
+                <div className="relative">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Copy-only handoff</p>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-text">Final album pack</h2>
+                  <p className="mt-3 text-sm leading-6 text-muted">The export stage is prepared from final selection metadata. Originals remain read-only; Phase 6 will add the production copy/export runner.</p>
+                  <div className="mt-6 grid grid-cols-2 gap-2">
+                    <div className="rounded-2xl bg-white/[0.055] px-4 py-3"><p className="font-mono text-lg text-text">{exportReadyCount}</p><p className="mt-1 text-xs text-subtle">Final memories</p></div>
+                    <div className="rounded-2xl bg-white/[0.055] px-4 py-3"><p className="font-mono text-lg text-text">{selectionSummary?.reviewCount ?? 0}</p><p className="mt-1 text-xs text-subtle">Review left</p></div>
+                  </div>
+                  <div className="mt-5 space-y-2 text-sm text-muted">
+                    <div className="rounded-2xl bg-white/[0.045] px-4 py-3">Original folders stay untouched</div>
+                    <div className="rounded-2xl bg-white/[0.045] px-4 py-3">Export path comes from project settings later</div>
+                    <div className="rounded-2xl bg-white/[0.045] px-4 py-3">Metadata-only handoff is ready for Phase 6 copy jobs</div>
+                  </div>
+                  <LumozaButton type="button" variant="primary" className="mt-6 w-full" disabled>Export runner comes in Phase 6</LumozaButton>
                 </div>
               </div>
-              <MemoryStrip photos={photos} />
+              <div className="min-h-0 rounded-[26px] bg-white/[0.025] p-4 shadow-soft">
+                <div className="mb-3 flex items-center justify-between text-sm">
+                  <span className="text-text">Final preview</span>
+                  <span className="font-mono text-xs text-subtle">{exportPhotos.length} shown</span>
+                </div>
+                <MemoryStrip photos={exportPhotos} />
+              </div>
             </div>
           ) : (
             <MemoryStrip photos={photos} />
@@ -209,7 +231,16 @@ export function StudioPage({ title, subtitle, mode, project, photos, peopleSumma
           <p className="text-sm text-text">{project?.name ?? "No project open"}</p>
           <p className="mt-2 text-sm text-subtle">{photos.length} memories</p>
         </div>
-        {mode === "people" ? (
+        {mode === "export" ? (
+          <div className="rounded-[28px] bg-white/[0.03] p-5 shadow-soft">
+            <p className="text-sm text-text">Export readiness</p>
+            <div className="mt-4 space-y-2 text-sm text-muted">
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3">Selection run: {selectionSummary?.lastStatus ?? "not ready"}</div>
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3">Final target: {selectionSummary?.finalCountTarget ?? 300}</div>
+              <div className="rounded-2xl bg-white/[0.045] px-3 py-3">Copy safety: originals read-only</div>
+            </div>
+          </div>
+        ) : mode === "people" ? (
           <div className="rounded-[28px] bg-white/[0.03] p-5 shadow-soft">
             <p className="text-sm text-text">People intelligence</p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm">

@@ -1021,7 +1021,7 @@ export function App() {
   } else if (currentView === "import") {
     content = <StudioPage mode="import" title="Import Photos" subtitle="Bring memories into this local workspace." project={currentProject} photos={projectPhotos} />;
   } else if (currentView === "export") {
-    content = <StudioPage mode="export" title="Export" subtitle="Prepare the final collection." project={currentProject} photos={projectPhotos} />;
+    content = <StudioPage mode="export" title="Export" subtitle="Prepare the final collection." project={currentProject} photos={projectPhotos} finalSelectionPhotos={finalSelectionPhotos} selectionSummary={selectionSummary} />;
   } else if (currentView === "operations") {
     content = (
       <OperationsPage

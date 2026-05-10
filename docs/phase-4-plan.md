@@ -4,12 +4,12 @@
 
 Build the smart selection engine that turns Phase 2 technical scores and Phase 3 people priorities into a final memory collection, review queue, and refilterable album workflow.
 
-Current phase status: in progress
+Current phase status: complete
 
-Phase 4 progress: 80% complete
-Full product progress: 77% overall
+Phase 4 progress: 100% complete
+Full product progress: 81% overall
 
-Phase 4 now has the durable selection model, runnable local engine, final/review/rejected browsing, target-count controls, user override controls, event coverage balancing, low-confidence review routing, and persistence/refilter tests. It does not yet complete fast keyboard review ergonomics or final/export handoff polish.
+Phase 4 now has the durable selection model, runnable local engine, final/review/rejected browsing, target-count controls, user override controls, event coverage balancing, low-confidence review routing, keyboard review ergonomics, export handoff preview, and persistence/refilter tests.
 
 ## Completed So Far
 
@@ -24,11 +24,12 @@ Phase 4 now has the durable selection model, runnable local engine, final/review
 - Added protect, force include, force exclude, and clear controls on photo cards
 - Added override labels to native photo responses and frontend photo models
 - Added Rust tests for priority-people ranking, force-exclude behavior, event coverage, low-confidence review routing, override persistence, and refilter replacement
+- Added focused keyboard review controls for protect, include, exclude, clear, and next/previous navigation
+- Added final/export handoff preview with copy-only safety messaging
 
 ## Remaining Phase 4 Work
 
-- Review workspace fast keyboard approve/reject flow
-- Final workspace batch review and export handoff polish
+None. Phase 4 is complete.
 
 ## Acceptance Criteria For Phase 4 Completion
 

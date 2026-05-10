@@ -11,6 +11,8 @@ interface ThumbnailCardProps {
   style: CSSProperties;
   height: number;
   previewHeight: number;
+  isSelected?: boolean;
+  onSelect?: (photoId: string) => void;
   onSetOverride?: (photoId: string, overrideLabel: PhotoOverrideAction) => void;
 }
 
@@ -54,12 +56,24 @@ function OverrideButton({ label, title, active, onClick, children }: { label: st
   );
 }
 
-export function ThumbnailCard({ photo, previewSrc, style, height, previewHeight, onSetOverride }: ThumbnailCardProps) {
+export function ThumbnailCard({ photo, previewSrc, style, height, previewHeight, isSelected, onSelect, onSetOverride }: ThumbnailCardProps) {
   const overallScore = photo.quality?.overallScore;
   const rankingScore = photo.rankingScore;
 
   return (
-    <article style={{ ...style, height: `${height}px` }} className="group absolute flex flex-col overflow-hidden rounded-[22px] border border-white/8 bg-panel/80 shadow-soft transition duration-300 ease-lz hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-glow">
+    <article
+      style={{ ...style, height: `${height}px` }}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(photo.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect?.(photo.id);
+        }
+      }}
+      className={`group absolute flex flex-col overflow-hidden rounded-[22px] border bg-panel/80 shadow-soft transition duration-300 ease-lz hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-glow ${isSelected ? "border-accent/70 ring-2 ring-accent/25 shadow-glow" : "border-white/8"}`}
+    >
       <div className="relative overflow-hidden bg-gradient-to-br from-white/10 via-white/5 to-transparent" style={{ height: `${previewHeight}px` }}>
         <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap gap-2 p-3">
           {overallScore !== undefined ? <StatusPill tone="accent">{(overallScore * 100).toFixed(0)} quality</StatusPill> : null}

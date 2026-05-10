@@ -1,4 +1,5 @@
-import { BrainCircuit, ScanLine, SlidersHorizontal, Sparkles, Trophy, UsersRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BrainCircuit, CheckCircle2, RotateCcw, ScanLine, ShieldCheck, SlidersHorizontal, Sparkles, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ProjectPhotoGrid } from "../components/photo-grid/ProjectPhotoGrid";
 import type { PhotoOverrideAction } from "../components/ui/ThumbnailCard";
 import { ScanProgressCard } from "../components/progress/ScanProgressCard";
@@ -93,6 +94,72 @@ export function ProjectWorkspace({
   onResume,
   onCancel,
 }: ProjectWorkspaceProps) {
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | undefined>();
+  const selectedPhoto = useMemo(() => photos.find((photo) => photo.id === selectedPhotoId) ?? photos[0], [photos, selectedPhotoId]);
+
+  useEffect(() => {
+    if (photos.length === 0) {
+      setSelectedPhotoId(undefined);
+      return;
+    }
+    if (!selectedPhotoId || !photos.some((photo) => photo.id === selectedPhotoId)) {
+      setSelectedPhotoId(photos[0].id);
+    }
+  }, [photos, selectedPhotoId]);
+
+  const moveSelection = (direction: 1 | -1) => {
+    if (photos.length === 0) {
+      return;
+    }
+    const currentIndex = Math.max(0, photos.findIndex((photo) => photo.id === selectedPhoto?.id));
+    const nextIndex = Math.min(photos.length - 1, Math.max(0, currentIndex + direction));
+    setSelectedPhotoId(photos[nextIndex].id);
+  };
+
+  const applySelectedOverride = (overrideLabel: PhotoOverrideAction) => {
+    if (!selectedPhoto) {
+      return;
+    }
+    onSetPhotoOverride(selectedPhoto.id, overrideLabel);
+    if (selectionBucket === "review") {
+      moveSelection(1);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, button")) {
+        return;
+      }
+      if (!selectedPhoto) {
+        return;
+      }
+      if (event.key === "ArrowRight" || event.key === "j") {
+        event.preventDefault();
+        moveSelection(1);
+      } else if (event.key === "ArrowLeft" || event.key === "k") {
+        event.preventDefault();
+        moveSelection(-1);
+      } else if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        applySelectedOverride("protect");
+      } else if (event.key.toLowerCase() === "i") {
+        event.preventDefault();
+        applySelectedOverride("force_include");
+      } else if (event.key.toLowerCase() === "x") {
+        event.preventDefault();
+        applySelectedOverride("force_exclude");
+      } else if (event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        applySelectedOverride("clear");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [photos, selectedPhoto, selectionBucket, onSetPhotoOverride]);
+
   const averageScore = analysisSummary?.averageOverallScore ?? averageQualityScore(photos);
   const duplicateGroupCount = analysisTask?.duplicateGroupCount ?? analysisSummary?.duplicateGroupCount ?? 0;
   const burstGroupCount = analysisTask?.burstGroupCount ?? analysisSummary?.burstGroupCount ?? 0;
@@ -157,6 +224,20 @@ export function ProjectWorkspace({
           </div>
         </div>
 
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-[24px] bg-ink/28 px-3 py-2 shadow-soft">
+          <div className="min-w-0 text-xs text-subtle">
+            <span className="text-muted">Focused:</span> <span className="text-text">{selectedPhoto?.filename ?? "No memory selected"}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" className="lumoza-focus rounded-xl bg-white/[0.055] px-2.5 py-1.5 text-xs text-muted hover:text-text" onClick={() => moveSelection(-1)}>←/K</button>
+            <button type="button" className="lumoza-focus rounded-xl bg-white/[0.055] px-2.5 py-1.5 text-xs text-muted hover:text-text" onClick={() => moveSelection(1)}>→/J</button>
+            <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-purple/12 px-2.5 py-1.5 text-xs text-purple hover:bg-purple/18" disabled={!selectedPhoto} onClick={() => applySelectedOverride("protect")}><ShieldCheck className="h-3.5 w-3.5" /> P</button>
+            <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-success/10 px-2.5 py-1.5 text-xs text-success hover:bg-success/15" disabled={!selectedPhoto} onClick={() => applySelectedOverride("force_include")}><CheckCircle2 className="h-3.5 w-3.5" /> I</button>
+            <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-error/10 px-2.5 py-1.5 text-xs text-error hover:bg-error/15" disabled={!selectedPhoto} onClick={() => applySelectedOverride("force_exclude")}><XCircle className="h-3.5 w-3.5" /> X</button>
+            <button type="button" className="lumoza-focus inline-flex items-center gap-1 rounded-xl bg-white/[0.055] px-2.5 py-1.5 text-xs text-muted hover:text-text" disabled={!selectedPhoto} onClick={() => applySelectedOverride("clear")}><RotateCcw className="h-3.5 w-3.5" /> C</button>
+          </div>
+        </div>
+
         <ProjectPhotoGrid
           photos={photos}
           isLoading={isLoadingPhotos}
@@ -164,6 +245,8 @@ export function ProjectWorkspace({
           hasMore={hasMorePhotos}
           error={photoError}
           onLoadMore={onLoadMorePhotos}
+          selectedPhotoId={selectedPhoto?.id}
+          onSelectPhoto={setSelectedPhotoId}
           onSetPhotoOverride={onSetPhotoOverride}
         />
       </section>
